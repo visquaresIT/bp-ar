@@ -1,61 +1,52 @@
 import './style.css'
-import * as THREE from 'https://esm.sh/three@0.160.0'
-import { MindARThree } from 'https://esm.sh/mind-ar@1.2.5/dist/mindar-image-three.prod.js'
+import * as THREE from 'https://esm.sh/three@0.152.2'
+import { DRACOLoader } from 'https://esm.sh/three@0.152.2/examples/jsm/loaders/DRACOLoader.js'
+import { GLTFLoader } from 'https://esm.sh/three@0.152.2/examples/jsm/loaders/GLTFLoader.js'
+import { MindARThree } from 'https://esm.sh/mind-ar@1.2.5/dist/mindar-image-three.prod.js?deps=three@0.152.2'
 
-const TARGETS_URL =
-  'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind'
-const TARGET_IMAGE_URL =
-  'https://hiukim.github.io/mind-ar-js-doc/assets/images/card-06cb9111a8e32627db6bfafc7aa22a4d.png'
+const TARGETS_URL = new URL('../assets/target-original.mind', import.meta.url).href
+const TARGET_IMAGE_URL = new URL('../assets/sea-mine.png', import.meta.url).href
+const MODEL_URL = new URL('../assets/platform-mine.glb', import.meta.url).href
+
+const TRACKING_CONFIG = {
+  filterMinCF: 0.0001,
+  filterBeta: 5,
+  warmupTolerance: 8,
+  missTolerance: 12,
+}
 
 document.querySelector('#app').innerHTML = `
-  <main class="shell">
-    <section class="intro">
-      <p class="eyebrow">MindAR + Three.js</p>
-      <h1>Image tracking AR starter</h1>
-      <p class="lede">
-        This demo uses the sample MindAR target from the docs so you can run it
-        immediately, then replace it with your own compiled <span>.mind</span>
-        file.
-      </p>
-      <div class="actions">
-        <button class="primary" type="button" data-start>Start camera</button>
-        <button class="secondary" type="button" data-stop disabled>Stop</button>
-      </div>
-      <div class="meta-row">
-        <span class="status-pill" data-status data-tone="neutral">Ready to start</span>
-        <a href="${TARGET_IMAGE_URL}" target="_blank" rel="noreferrer">Open sample target image</a>
+  <main class="app-shell" data-app data-view="welcome" data-tracking="idle">
+    <section class="welcome-screen" data-screen="welcome">
+      <div class="welcome-panel">
+        <h1>Welcome to BP AR Demo</h1>
+        <button class="start-button" type="button" data-start>Start Experience</button>
+        <p class="welcome-error" data-welcome-error hidden></p>
       </div>
     </section>
 
-    <section class="stage-panel">
-      <div class="stage-copy">
-        <p>Point your camera at the sample card after starting the experience.</p>
-        <p>
-          To use your own image, compile it with the
-          <a href="https://hiukim.github.io/mind-ar-js-doc/tools/compile" target="_blank" rel="noreferrer">MindAR compiler</a>
-          and swap the target URL in <span>src/main.js</span>.
-        </p>
-      </div>
-      <div class="stage">
-        <div class="stage-grid"></div>
-        <div class="ar-surface" data-ar-container></div>
-        <div class="overlay-card">
-          <p class="overlay-label">Live State</p>
-          <h2 data-overlay-heading>Waiting for camera</h2>
-          <p data-overlay-copy>
-            Start the experience, allow camera access, then hold the sample card in view.
-          </p>
+    <section class="experience-screen" data-screen="experience" aria-hidden="true">
+      <div class="ar-surface" data-ar-container></div>
+      <div class="scan-overlay" aria-hidden="true">
+        <div class="scan-frame">
+          <span class="scan-corner scan-corner--top-left"></span>
+          <span class="scan-corner scan-corner--top-right"></span>
+          <span class="scan-corner scan-corner--bottom-left"></span>
+          <span class="scan-corner scan-corner--bottom-right"></span>
+          <span class="scan-line"></span>
         </div>
       </div>
+      <p class="sr-only" data-status aria-live="polite">Ready to start.</p>
     </section>
   </main>
 `
 
+const appShell = document.querySelector('[data-app]')
+const welcomeScreen = document.querySelector('[data-screen="welcome"]')
+const experienceScreen = document.querySelector('[data-screen="experience"]')
 const startButton = document.querySelector('[data-start]')
-const stopButton = document.querySelector('[data-stop]')
-const statusPill = document.querySelector('[data-status]')
-const overlayHeading = document.querySelector('[data-overlay-heading]')
-const overlayCopy = document.querySelector('[data-overlay-copy]')
+const welcomeError = document.querySelector('[data-welcome-error]')
+const statusRegion = document.querySelector('[data-status]')
 const container = document.querySelector('[data-ar-container]')
 
 const mindarThree = new MindARThree({
@@ -65,14 +56,28 @@ const mindarThree = new MindARThree({
   uiScanning: 'no',
   uiError: 'no',
   maxTrack: 1,
-  warmupTolerance: 2,
-  missTolerance: 2,
+  ...TRACKING_CONFIG,
 })
 
 const { renderer, scene, camera } = mindarThree
 const clock = new THREE.Clock()
+const dracoLoader = new DRACOLoader()
+const gltfLoader = new GLTFLoader()
+const smoothedPosition = new THREE.Vector3()
+const smoothedQuaternion = new THREE.Quaternion()
+const smoothedScale = new THREE.Vector3()
+const targetPosition = new THREE.Vector3()
+const targetQuaternion = new THREE.Quaternion()
+const targetScale = new THREE.Vector3()
+
+const POSE_LERP_ALPHA = 0.2
+const SCALE_LERP_ALPHA = 0.25
+
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/')
+gltfLoader.setDRACOLoader(dracoLoader)
 
 renderer.setClearColor(0x000000, 0)
+renderer.outputColorSpace = THREE.SRGBColorSpace
 
 const hemiLight = new THREE.HemisphereLight(0xfff4d6, 0x0e1b2f, 1.15)
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.2)
@@ -80,102 +85,296 @@ keyLight.position.set(0.4, 1.2, 1.4)
 scene.add(hemiLight, keyLight)
 
 const anchor = mindarThree.addAnchor(0)
+const stabilizedRoot = new THREE.Group()
+const contentRoot = new THREE.Group()
+const modelRig = new THREE.Group()
 
-const plate = new THREE.Mesh(
-  new THREE.PlaneGeometry(1, 0.55),
-  new THREE.MeshStandardMaterial({
-    color: 0x1b2d45,
-    metalness: 0.15,
-    roughness: 0.45,
-  }),
-)
+stabilizedRoot.visible = false
+scene.add(stabilizedRoot)
 
-const knot = new THREE.Mesh(
-  new THREE.TorusKnotGeometry(0.15, 0.045, 160, 20),
-  new THREE.MeshStandardMaterial({
-    color: 0xff875f,
-    emissive: 0x9f2b10,
-    emissiveIntensity: 0.35,
-    metalness: 0.35,
-    roughness: 0.25,
-  }),
-)
+contentRoot.position.z = 0.02
+contentRoot.add(modelRig)
+stabilizedRoot.add(contentRoot)
 
-const halo = new THREE.Mesh(
-  new THREE.TorusGeometry(0.28, 0.015, 24, 100),
+const glowRing = new THREE.Mesh(
+  new THREE.TorusGeometry(0.34, 0.012, 24, 120),
   new THREE.MeshBasicMaterial({
     color: 0x7bf0d1,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.75,
   }),
 )
 
-plate.position.set(0, 0, 0)
-knot.position.set(0, 0.08, 0.15)
-halo.position.set(0, 0.02, 0.04)
-halo.rotation.x = Math.PI / 2
+const shadowDisc = new THREE.Mesh(
+  new THREE.CircleGeometry(0.28, 48),
+  new THREE.MeshBasicMaterial({
+    color: 0x08111d,
+    transparent: true,
+    opacity: 0.26,
+  }),
+)
 
-anchor.group.add(plate, knot, halo)
+glowRing.rotation.x = Math.PI / 2
+shadowDisc.position.z = 0.001
+// contentRoot.add(glowRing, shadowDisc)
+
+let platformModel = null
+const platformModelPromise = gltfLoader.loadAsync(MODEL_URL).then((gltf) => {
+  const nextModel = gltf.scene
+
+  nextModel.traverse((child) => {
+    if (!child.isMesh) return
+
+    child.frustumCulled = false
+
+    if (child.material?.map) {
+      child.material.map.colorSpace = THREE.SRGBColorSpace
+    }
+  })
+
+  nextModel.rotation.x = -Math.PI / 2
+  nextModel.updateMatrixWorld(true)
+
+  const initialBounds = new THREE.Box3().setFromObject(nextModel)
+  const initialSize = initialBounds.getSize(new THREE.Vector3())
+  const scale = 0.8 / Math.max(initialSize.x, initialSize.y, initialSize.z, 1)
+
+  nextModel.scale.setScalar(scale)
+  nextModel.updateMatrixWorld(true)
+
+  const scaledBounds = new THREE.Box3().setFromObject(nextModel)
+  const center = scaledBounds.getCenter(new THREE.Vector3())
+  const minZ = scaledBounds.min.z
+
+  nextModel.position.set(-center.x, -center.y, -minZ + 0.015)
+  modelRig.add(nextModel)
+  platformModel = nextModel
+
+  return nextModel
+})
 
 let running = false
 
-const setStatus = (text, tone = 'neutral') => {
-  statusPill.textContent = text
-  statusPill.dataset.tone = tone
+const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve))
+
+const syncExperienceLayers = () => {
+  const video = container.querySelector('video') ?? document.querySelector('video')
+  const canvas = renderer.domElement
+
+  if (video) {
+    if (video.parentElement !== container) {
+      container.prepend(video)
+    }
+
+    video.setAttribute('playsinline', 'true')
+    video.setAttribute('muted', 'true')
+    video.muted = true
+
+    Object.assign(video.style, {
+      position: 'absolute',
+      inset: '0',
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover',
+      display: 'block',
+      opacity: '1',
+      visibility: 'visible',
+      background: 'transparent',
+      zIndex: '0',
+    })
+  }
+
+  if (canvas.parentElement !== container) {
+    container.appendChild(canvas)
+  }
+
+  renderer.setClearColor(0x000000, 0)
+
+  Object.assign(canvas.style, {
+    position: 'absolute',
+    inset: '0',
+    width: '100%',
+    height: '100%',
+    display: 'block',
+    opacity: '1',
+    visibility: 'visible',
+    background: 'transparent',
+    zIndex: '1',
+  })
 }
 
-const setOverlay = (heading, copy) => {
-  overlayHeading.textContent = heading
-  overlayCopy.textContent = copy
+const setView = (view) => {
+  appShell.dataset.view = view
+  const isWelcome = view === 'welcome'
+  welcomeScreen.setAttribute('aria-hidden', String(!isWelcome))
+  experienceScreen.setAttribute('aria-hidden', String(isWelcome))
+}
+
+const setTrackingState = (state) => {
+  appShell.dataset.tracking = state
+}
+
+const setStatus = (text) => {
+  statusRegion.textContent = text
+}
+
+const setWelcomeError = (text = '') => {
+  welcomeError.hidden = !text
+  welcomeError.textContent = text
+}
+
+const resetWelcome = (message = '') => {
+  setView('welcome')
+  setTrackingState('idle')
+  setWelcomeError(message)
+}
+
+const getCameraIssue = async () => {
+  if (!window.isSecureContext) {
+    return {
+      status: 'Camera requires a secure page',
+      heading: 'Secure context required',
+      copy: 'Open this app on localhost or HTTPS before starting the camera.',
+    }
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return {
+      status: 'Camera API unavailable',
+      heading: 'Camera not supported',
+      copy: 'Use a browser and device that expose getUserMedia for camera access.',
+    }
+  }
+
+  if (!navigator.permissions?.query) {
+    return null
+  }
+
+  try {
+    const permission = await navigator.permissions.query({ name: 'camera' })
+
+    if (permission.state === 'denied') {
+      return {
+        status: 'Camera permission blocked',
+        heading: 'Camera access is blocked',
+        copy: 'Allow camera access for this site in your browser settings, then try again.',
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
 }
 
 const renderFrame = () => {
   const elapsed = clock.getElapsedTime()
 
-  knot.rotation.x = elapsed * 0.55
-  knot.rotation.y = elapsed * 0.8
-  halo.rotation.z = elapsed * 0.65
+  if (anchor.group.visible) {
+    anchor.group.updateMatrixWorld(true)
+    anchor.group.matrixWorld.decompose(targetPosition, targetQuaternion, targetScale)
 
-  const pulse = 1 + Math.sin(elapsed * 3.2) * 0.06
-  halo.scale.setScalar(pulse)
+    if (!stabilizedRoot.visible) {
+      smoothedPosition.copy(targetPosition)
+      smoothedQuaternion.copy(targetQuaternion)
+      smoothedScale.copy(targetScale)
+      stabilizedRoot.visible = true
+    } else {
+      smoothedPosition.lerp(targetPosition, POSE_LERP_ALPHA)
+      smoothedQuaternion.slerp(targetQuaternion, POSE_LERP_ALPHA)
+      smoothedScale.lerp(targetScale, SCALE_LERP_ALPHA)
+    }
+
+    stabilizedRoot.position.copy(smoothedPosition)
+    stabilizedRoot.quaternion.copy(smoothedQuaternion)
+    stabilizedRoot.scale.copy(smoothedScale)
+  } else if (stabilizedRoot.visible) {
+    stabilizedRoot.visible = false
+  }
+
+  const pulse = 1 + Math.sin(elapsed * 2.8) * 0.05
+  glowRing.rotation.z = elapsed * 0.45
+  glowRing.scale.setScalar(pulse)
+  shadowDisc.scale.setScalar(1 + Math.sin(elapsed * 2.8) * 0.025)
+  contentRoot.position.z = 0.02 + Math.sin(elapsed * 1.8) * 0.008
+
+  if (platformModel) {
+    modelRig.rotation.z = Math.sin(elapsed * 0.45) * 0.035
+  }
 
   renderer.render(scene, camera)
 }
 
 anchor.onTargetFound = () => {
-  setStatus('Target locked', 'success')
-  setOverlay('Target detected', 'The AR object is now anchored to the tracked image.')
+  anchor.group.updateMatrixWorld(true)
+  anchor.group.matrixWorld.decompose(smoothedPosition, smoothedQuaternion, smoothedScale)
+  stabilizedRoot.position.copy(smoothedPosition)
+  stabilizedRoot.quaternion.copy(smoothedQuaternion)
+  stabilizedRoot.scale.copy(smoothedScale)
+  stabilizedRoot.visible = true
+  setTrackingState('locked')
+  setStatus('Target locked.')
 }
 
 anchor.onTargetLost = () => {
   if (!running) return
 
-  setStatus('Scanning for target', 'neutral')
-  setOverlay('Scanning', 'Keep the sample image flat, bright, and fully inside the camera view.')
+  stabilizedRoot.visible = false
+  setTrackingState('scanning')
+  setStatus('Scanning for target.')
 }
 
 const startExperience = async () => {
   if (running) return
 
   startButton.disabled = true
-  setStatus('Requesting camera access', 'neutral')
-  setOverlay('Starting camera', 'Allow camera access when the browser prompts you.')
+  setWelcomeError('')
+  setView('experience')
+  setTrackingState('starting')
+  setStatus('Requesting camera access.')
 
   try {
+    await waitForNextFrame()
+
+    const cameraIssue = await getCameraIssue()
+
+    if (cameraIssue) {
+      setStatus(cameraIssue.status)
+      resetWelcome(cameraIssue.copy)
+      return
+    }
+
+    if (!platformModel) {
+      setStatus('Loading 3D model.')
+      await platformModelPromise
+    }
+
     await mindarThree.start()
+  syncExperienceLayers()
     clock.start()
     renderer.setAnimationLoop(renderFrame)
     running = true
-    stopButton.disabled = false
-    setStatus('Scanning for target', 'neutral')
-    setOverlay('Camera live', 'Point the camera at the sample card to trigger the 3D marker.')
+    setTrackingState('scanning')
+    setStatus('Scanning for target.')
   } catch (error) {
     console.error(error)
-    setStatus('Camera start failed', 'error')
-    setOverlay(
-      'Unable to start',
-      'Use localhost or HTTPS, then allow camera access and try again.',
-    )
+
+    const cameraIssue = await getCameraIssue()
+
+    if (cameraIssue) {
+      setStatus(cameraIssue.status)
+      resetWelcome(cameraIssue.copy)
+      return
+    }
+
+    if (!platformModel) {
+      setStatus('Model load failed.')
+      resetWelcome('Unable to load the model. Check assets/platform-mine.glb and try again.')
+      return
+    }
+
+    setStatus('Camera start failed.')
+    resetWelcome('Unable to start the camera. Allow access and try again.')
   } finally {
     startButton.disabled = false
   }
@@ -188,11 +387,10 @@ const stopExperience = () => {
   clock.stop()
   mindarThree.stop()
   running = false
-  stopButton.disabled = true
-  setStatus('Experience stopped', 'neutral')
-  setOverlay('Stopped', 'Start the camera again whenever you want to resume tracking.')
+  stabilizedRoot.visible = false
+  setStatus('Experience stopped.')
+  resetWelcome()
 }
 
 startButton.addEventListener('click', startExperience)
-stopButton.addEventListener('click', stopExperience)
 window.addEventListener('pagehide', stopExperience)
