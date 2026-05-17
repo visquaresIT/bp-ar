@@ -37,11 +37,24 @@ class App {
     this.canvasHeight = 0
     this.mindARVideo = null
 
+    this.bpJacketIndex = 2
+    this.bpJacketModel = null
+    this.bpJacketRotationY = 0
+    this.bpJacketTargetFound = false
+    this.userInteracting = false
+    this.lastInteractionTime = 0
+    this.autoRotateSpeed = 0.01
+    this.autoRotateResumeDelay = 1500
+    this.rotationSensitivity = 0.008
+    this.pointerLastX = 0
+    this.activePointerId = null
+
     this.setupDracoAndLoader()
     this.initAR()
     this.addLight()
     this.addModel()
     this.addControl()
+    this.addRotationControl()
   }
 
   initAR() {
@@ -76,7 +89,7 @@ class App {
     this.markerConfigs.forEach((config, index) => {
       this.gltfLoader.load(config.file, (gltf) => {
         const model = gltf.scene
-        model.scale.set(0.06, 0.06, 0.06)
+        model.scale.set(0.5, 0.5, 0.5)
         model.position.set(0, 0, 0)
 
         const box = new THREE.Box3().setFromObject(model)
@@ -120,8 +133,73 @@ class App {
 
         this.mixers[index] = mixer
         this.anchors[index].group.add(model)
+
+        if (index === this.bpJacketIndex) {
+          this.bpJacketModel = model
+        }
       })
     })
+
+    const bpAnchor = this.anchors[this.bpJacketIndex]
+    if (bpAnchor) {
+      bpAnchor.onTargetFound = () => {
+        this.bpJacketTargetFound = true
+      }
+      bpAnchor.onTargetLost = () => {
+        this.bpJacketTargetFound = false
+        this.userInteracting = false
+        this.activePointerId = null
+      }
+    }
+  }
+
+  addRotationControl() {
+    const canvas = this.renderer.domElement
+    canvas.style.pointerEvents = 'auto'
+    canvas.style.touchAction = 'none'
+
+    const onPointerDown = (event) => {
+      if (!this.bpJacketTargetFound || !this.bpJacketModel) return
+      this.userInteracting = true
+      this.activePointerId = event.pointerId
+      this.pointerLastX = event.clientX
+      if (canvas.setPointerCapture) {
+        try {
+          canvas.setPointerCapture(event.pointerId)
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    const onPointerMove = (event) => {
+      if (!this.userInteracting || event.pointerId !== this.activePointerId) return
+      if (!this.bpJacketModel) return
+      const deltaX = event.clientX - this.pointerLastX
+      this.pointerLastX = event.clientX
+      this.bpJacketRotationY += deltaX * this.rotationSensitivity
+      this.bpJacketModel.rotation.y = this.bpJacketRotationY
+    }
+
+    const onPointerEnd = (event) => {
+      if (event.pointerId !== this.activePointerId) return
+      this.userInteracting = false
+      this.activePointerId = null
+      this.lastInteractionTime = performance.now()
+      if (canvas.releasePointerCapture) {
+        try {
+          canvas.releasePointerCapture(event.pointerId)
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    canvas.addEventListener('pointerdown', onPointerDown)
+    canvas.addEventListener('pointermove', onPointerMove)
+    canvas.addEventListener('pointerup', onPointerEnd)
+    canvas.addEventListener('pointercancel', onPointerEnd)
+    canvas.addEventListener('pointerleave', onPointerEnd)
   }
 
   addLight() {
@@ -183,6 +261,14 @@ class App {
       previousTime = time
 
       this.mixers.forEach((mixer) => mixer && mixer.update(deltaTime))
+
+      if (this.bpJacketModel && this.bpJacketTargetFound && !this.userInteracting) {
+        const idleFor = time - this.lastInteractionTime
+        if (this.lastInteractionTime === 0 || idleFor > this.autoRotateResumeDelay) {
+          this.bpJacketRotationY += this.autoRotateSpeed
+          this.bpJacketModel.rotation.y = this.bpJacketRotationY
+        }
+      }
 
       this.renderer.render(this.scene, this.camera)
     })
