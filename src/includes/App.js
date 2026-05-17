@@ -75,9 +75,9 @@ class App {
     this.scene = this.mindArTHREE.scene
 
     this.mindArTHREE.filterMinCF = 0.0001
-    this.mindArTHREE.filterBeta = 0.001
-    this.mindArTHREE.warmupTolerance = 1
-    this.mindArTHREE.missTolerance = 1
+    this.mindArTHREE.filterBeta = 0.01
+    this.mindArTHREE.warmupTolerance = 5
+    this.mindArTHREE.missTolerance = 5
 
     this.anchors = this.markerConfigs.map((_, i) => this.mindArTHREE.addAnchor(i))
   }
