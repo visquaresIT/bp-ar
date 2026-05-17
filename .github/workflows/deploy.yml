@@ -1,0 +1,54 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Optional build step. Uncomment & adapt for React/Vue/Astro/etc. ──
+      # - name: Setup Node
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: '22'
+      #     cache: 'npm'
+      # - run: npm ci
+      # - run: npm run build
+
+      - name: Setup SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy via rsync
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          DOMAIN: bp60years.com
+          SOURCE_DIR: dist
+        run: |
+          # SSH key is rrsync-restricted to /var/www/sites on the server,
+          # so the rsync target path is RELATIVE to that root.
+          rsync -rltvz --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'node_modules' \
+            --exclude '.env*' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            "$SOURCE_DIR/" \
+            "deploy@$VPS_HOST:$DOMAIN/public/"
