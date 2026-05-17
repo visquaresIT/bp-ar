@@ -18,7 +18,7 @@ class App {
     this.gltfLoader = null
     this.markerConfigs = [
       { file: '/models/train.glb', clipIndex: 0 }, // 0: 60 YEARS logo
-      { file: '/models/train.glb', clipIndex: 0 }, // 1: Indonesia map
+      { file: '/models/indonesian-map.glb', clipIndex: 0 }, // 1: Indonesia map
       { file: '/models/bp-jacket.glb', clipIndex: 0, baked: true }, // 2: Square pattern
       { file: '/models/train.glb', clipIndex: 0 }, // 3: Tag / container
       { file: '/models/train.glb', clipIndex: 0 }, // 4: CO2
