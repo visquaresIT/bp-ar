@@ -19,7 +19,7 @@ class App {
     this.markerConfigs = [
       { file: '/models/train.glb', clipIndex: 0 }, // 0: 60 YEARS logo
       { file: '/models/train.glb', clipIndex: 0 }, // 1: Indonesia map
-      { file: '/models/bp-jacket.glb', clipIndex: 0 }, // 2: Square pattern
+      { file: '/models/bp-jacket.glb', clipIndex: 0, baked: true }, // 2: Square pattern
       { file: '/models/train.glb', clipIndex: 0 }, // 3: Tag / container
       { file: '/models/train.glb', clipIndex: 0 }, // 4: CO2
       { file: '/models/train.glb', clipIndex: 0 }, // 5: Bor
@@ -58,6 +58,7 @@ class App {
 
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.container.appendChild(this.renderer.domElement)
 
     this.camera = this.mindArTHREE.camera
@@ -83,7 +84,22 @@ class App {
         model.position.sub(center)
 
         model.traverse((child) => {
-          if (child.isMesh) {
+          if (!child.isMesh) return
+
+          if (child.material?.map) {
+            child.material.map.colorSpace = THREE.SRGBColorSpace
+          }
+
+          if (config.baked) {
+            const src = child.material
+            child.material = new THREE.MeshBasicMaterial({
+              map: src.map ?? null,
+              alphaMap: src.alphaMap ?? null,
+              transparent: src.transparent ?? false,
+              opacity: src.opacity ?? 1,
+              side: src.side ?? THREE.FrontSide,
+            })
+          } else {
             child.material.envMap = this.neutralEnvironment
             child.material.needsUpdate = true
           }
