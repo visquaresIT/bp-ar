@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node *)",
+      "Bash(mkdir -p /tmp/mindar-build)",
+      "Bash(sips -s format png --resampleWidth 2000 \"/Users/visquare/Downloads/\\(Option 1\\) bp - 60th Anniversary Logo.pdf\" --out /tmp/mindar-build/bp-60th.png)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" node scripts/compile-marker.mjs public/bp-60th-anniversary.mind /tmp/mindar-build/bp-60th-small.png /Users/visquare/Downloads/marker-peta-indonesia.png /Users/visquare/Downloads/square.png /Users/visquare/Downloads/tag.png /Users/visquare/Downloads/co2.png /Users/visquare/Downloads/bor.png)",
+      "Bash(wrangler --version)",
+      "Bash(npx wrangler *)",
+      "Bash(npm run *)",
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/visquare/Downloads/60th.png)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" node scripts/compile-marker.mjs public/bp-60th-anniversary.mind /Users/visquare/Downloads/60th.png /Users/visquare/Downloads/marker-peta-indonesia.png /Users/visquare/Downloads/square.png /Users/visquare/Downloads/tag.png /Users/visquare/Downloads/co2.png /Users/visquare/Downloads/bor.png)",
+      "Bash(npx --no-install FBX2glTF --version)"
+    ]
+  }
+}

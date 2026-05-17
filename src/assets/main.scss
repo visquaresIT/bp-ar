@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#app {
+  min-height: 100%;
+  width: 100%;
+  margin: 0;
+  background: #000;
+  color: #f5f7fa;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.btn {
+  @apply px-4 py-3 bg-[#1C9B48] text-white rounded-full hover:bg-[#178a3f] flex justify-center items-center gap-1;
+  &.btn-success {
+    @apply px-4 py-3 bg-white hover:bg-white text-[#1C9B48] rounded-full flex justify-center items-center gap-1 ring-1 ring-[#1C9B48];
+  }
+}
+
+video {
+  max-width: inherit;
+  object-fit: cover;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+.mindar-ui-loading .loader {
+  @apply border-[3px] border-black/75 #{!important};
+  border-top: 3px solid #1C9B48 !important;
+  opacity: 0.8;
+  border-radius: 50%;
+  width: 32px !important;
+  height: 32px !important;
+  animation: spin 2s linear infinite;
+}
+
+.mindar-ui-scanning .scanning .inner .scanline {
+  @apply h-[2px] bg-accent #{!important};
+}

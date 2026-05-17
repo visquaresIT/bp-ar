@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('./stylesheet.css');
+
+.btn {
+  @apply px-4 py-3 bg-black text-accent rounded-full hover:bg-black/75 flex justify-center items-center gap-1;
+  font-family: 'Monument Extended', sans-serif;
+  &.btn-success {
+    @apply px-4 py-3 bg-accent hover:bg-accent text-black rounded-full flex justify-center items-center gap-1;
+  }
+}
+
+video {
+  // @apply mx-auto object-cover w-full;
+  max-width: inherit;
+  // height: auto !important;
+  object-fit: cover; /* Ensures video covers the screen without distortion */
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+.mindar-ui-loading .loader {
+  @apply border-[3px] border-black/75 #{!important};
+  border-top: 3px solid #a0d659 !important;
+  opacity: 0.8;
+  border-radius: 50%;
+  width: 32px !important;
+  height: 32px !important;
+  animation: spin 2s linear infinite;
+}
+
+.mindar-ui-scanning .scanning .inner {
+  background: url('/scan-frame.webp') no-repeat !important;
+  background-size: cover !important;
+  opacity: 0.5 !important;
+}
+
+.mindar-ui-scanning .scanning .inner .scanline {
+  @apply h-[2px] bg-accent #{!important};
+}
