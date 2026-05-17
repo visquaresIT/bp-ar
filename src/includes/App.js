@@ -41,20 +41,17 @@ class App {
     this.bpJacketModel = null
     this.bpJacketRotationY = 0
     this.bpJacketTargetFound = false
-    this.userInteracting = false
+    this.manualRotateDirection = 0
     this.lastInteractionTime = 0
     this.autoRotateSpeed = 0.01
+    this.manualRotateSpeed = 0.03
     this.autoRotateResumeDelay = 1500
-    this.rotationSensitivity = 0.008
-    this.pointerLastX = 0
-    this.activePointerId = null
 
     this.setupDracoAndLoader()
     this.initAR()
     this.addLight()
     this.addModel()
     this.addControl()
-    this.addRotationControl()
   }
 
   initAR() {
@@ -89,7 +86,7 @@ class App {
     this.markerConfigs.forEach((config, index) => {
       this.gltfLoader.load(config.file, (gltf) => {
         const model = gltf.scene
-        model.scale.set(0.5, 0.5, 0.5)
+        model.scale.set(0.15, 0.15, 0.15)
         model.position.set(0, 0, 0)
 
         const box = new THREE.Box3().setFromObject(model)
@@ -147,59 +144,16 @@ class App {
       }
       bpAnchor.onTargetLost = () => {
         this.bpJacketTargetFound = false
-        this.userInteracting = false
-        this.activePointerId = null
+        this.manualRotateDirection = 0
       }
     }
   }
 
-  addRotationControl() {
-    const canvas = this.renderer.domElement
-    canvas.style.pointerEvents = 'auto'
-    canvas.style.touchAction = 'none'
-
-    const onPointerDown = (event) => {
-      if (!this.bpJacketTargetFound || !this.bpJacketModel) return
-      this.userInteracting = true
-      this.activePointerId = event.pointerId
-      this.pointerLastX = event.clientX
-      if (canvas.setPointerCapture) {
-        try {
-          canvas.setPointerCapture(event.pointerId)
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-
-    const onPointerMove = (event) => {
-      if (!this.userInteracting || event.pointerId !== this.activePointerId) return
-      if (!this.bpJacketModel) return
-      const deltaX = event.clientX - this.pointerLastX
-      this.pointerLastX = event.clientX
-      this.bpJacketRotationY += deltaX * this.rotationSensitivity
-      this.bpJacketModel.rotation.y = this.bpJacketRotationY
-    }
-
-    const onPointerEnd = (event) => {
-      if (event.pointerId !== this.activePointerId) return
-      this.userInteracting = false
-      this.activePointerId = null
+  setBpJacketRotation(direction) {
+    this.manualRotateDirection = direction
+    if (direction === 0) {
       this.lastInteractionTime = performance.now()
-      if (canvas.releasePointerCapture) {
-        try {
-          canvas.releasePointerCapture(event.pointerId)
-        } catch (e) {
-          // ignore
-        }
-      }
     }
-
-    canvas.addEventListener('pointerdown', onPointerDown)
-    canvas.addEventListener('pointermove', onPointerMove)
-    canvas.addEventListener('pointerup', onPointerEnd)
-    canvas.addEventListener('pointercancel', onPointerEnd)
-    canvas.addEventListener('pointerleave', onPointerEnd)
   }
 
   addLight() {
@@ -262,11 +216,17 @@ class App {
 
       this.mixers.forEach((mixer) => mixer && mixer.update(deltaTime))
 
-      if (this.bpJacketModel && this.bpJacketTargetFound && !this.userInteracting) {
-        const idleFor = time - this.lastInteractionTime
-        if (this.lastInteractionTime === 0 || idleFor > this.autoRotateResumeDelay) {
-          this.bpJacketRotationY += this.autoRotateSpeed
+      if (this.bpJacketModel && this.bpJacketTargetFound) {
+        if (this.manualRotateDirection !== 0) {
+          this.bpJacketRotationY += this.manualRotateDirection * this.manualRotateSpeed
           this.bpJacketModel.rotation.y = this.bpJacketRotationY
+          this.lastInteractionTime = time
+        } else {
+          const idleFor = time - this.lastInteractionTime
+          if (this.lastInteractionTime === 0 || idleFor > this.autoRotateResumeDelay) {
+            // this.bpJacketRotationY += this.autoRotateSpeed
+            // this.bpJacketModel.rotation.y = this.bpJacketRotationY
+          }
         }
       }
 

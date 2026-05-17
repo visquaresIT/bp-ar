@@ -18,6 +18,8 @@
           @onInitCapture="initCapture()"
           @onRecordStarted="startRecording()"
           @onRecordEnded="stopRecording()"
+          @onRotateStart="handleRotateStart"
+          @onRotateEnd="handleRotateEnd"
         />
         <CaptureImage
           :open="openCapture"
@@ -182,6 +184,14 @@ const capture = async () => {
     }
     capturing.value = false
   }
+}
+
+const handleRotateStart = (direction) => {
+  if (app) app.setBpJacketRotation(direction)
+}
+
+const handleRotateEnd = () => {
+  if (app) app.setBpJacketRotation(0)
 }
 
 const startRecording = async () => {

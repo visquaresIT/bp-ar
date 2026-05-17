@@ -25,33 +25,41 @@
     </Transition>
     <div class="max-w-screen-sm mx-auto px-6 flex justify-center">
       <nav
-        :class="[{ 'w-[4.2rem]': recordingReady }, { 'w-[7.6rem]': !recordingReady }]"
-        class="transition-width duration-300 shadow-md flex justify-center items-center gap-2 p-2 bg-white rounded-full relative"
+        class="w-[14.6rem] shadow-md flex justify-center items-center gap-2 p-2 bg-white rounded-full relative"
       >
-        <!-- Timer Container -->
-        <div v-if="recording" class="absolute timer-container">
-          <svg class="timer-circle" viewBox="0 0 36 36">
-            <circle class="background-circle" cx="18" cy="18" r="16" fill="none"></circle>
-            <circle
-              class="progress-circle"
-              cx="18"
-              cy="18"
-              r="16"
-              fill="none"
-              :style="{ animationDuration: `${duration}s` }"
-            ></circle>
+        <!-- Rotate Left Button -->
+        <button
+          @pointerdown="startRotate(-1, $event)"
+          @pointerup="stopRotate($event)"
+          @pointercancel="stopRotate($event)"
+          @pointerleave="stopRotate($event)"
+          class="w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex items-center justify-center select-none touch-none"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+            class="size-6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
+            />
           </svg>
-        </div>
+        </button>
 
         <!-- Capture Image Button -->
         <button
           @click="initCapture"
           :class="
             !recording && !recordingReady
-              ? 'opacity-100 translate-x-[0px]'
-              : 'opacity-0 translate-x-[28px] pointer-events-none'
+              ? 'opacity-100'
+              : 'opacity-0 pointer-events-none'
           "
-          class="transition-all duration-300 w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex flex-col items-center justify-center"
+          class="transition-opacity duration-300 w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex flex-col items-center justify-center"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -69,50 +77,80 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
           </svg>
         </button>
-        <button
-          v-if="recording"
-          @click="toggleRecord"
-          class="w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex flex-col items-center justify-center"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="size-6 mx-6 animate-pulse"
+
+        <!-- Record Button (with timer overlay) -->
+        <div class="relative w-12 h-12">
+          <div v-if="recording" class="absolute timer-container">
+            <svg class="timer-circle" viewBox="0 0 36 36">
+              <circle class="background-circle" cx="18" cy="18" r="16" fill="none"></circle>
+              <circle
+                class="progress-circle"
+                cx="18"
+                cy="18"
+                r="16"
+                fill="none"
+                :style="{ animationDuration: `${duration}s` }"
+              ></circle>
+            </svg>
+          </div>
+          <button
+            @click="recording ? toggleRecord() : initRecord()"
+            class="w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex flex-col items-center justify-center"
           >
-            <path
-              fill-rule="evenodd"
-              d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm6-2.438c0-.724.588-1.312 1.313-1.312h4.874c.725 0 1.313.588 1.313 1.313v4.874c0 .725-.588 1.313-1.313 1.313H9.564a1.312 1.312 0 0 1-1.313-1.313V9.564Z"
-              clip-rule="evenodd"
-            />
-          </svg>
-        </button>
+            <svg
+              v-if="recording"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              class="size-6 animate-pulse"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm6-2.438c0-.724.588-1.312 1.313-1.312h4.874c.725 0 1.313.588 1.313 1.313v4.874c0 .725-.588 1.313-1.313 1.313H9.564a1.312 1.312 0 0 1-1.313-1.313V9.564Z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <svg
+              v-else-if="!recordingReady"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="size-6"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"
+              />
+            </svg>
+            <div v-else class="size-5 rounded-full bg-white"></div>
+          </button>
+        </div>
+
+        <!-- Rotate Right Button -->
         <button
-          :class="[
-            { '-translate-x-[0px]': !recordingReady },
-            { '-translate-x-[28px]': recordingReady },
-            { 'opacity-0 pointer-events-none': recordingReady && recording },
-          ]"
-          @click="initRecord"
-          class="transition-transform duration-300 w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex flex-col items-center justify-center"
+          @pointerdown="startRotate(1, $event)"
+          @pointerup="stopRotate($event)"
+          @pointercancel="stopRotate($event)"
+          @pointerleave="stopRotate($event)"
+          class="w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex items-center justify-center select-none touch-none"
         >
           <svg
-            v-if="!recordingReady"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
             stroke-width="1.5"
             stroke="currentColor"
-            class="size-6 mx-6"
+            class="size-6"
           >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
-              d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"
+              d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3"
             />
           </svg>
-
-          <div v-else class="size-5 rounded-full bg-white mx-6"></div>
         </button>
       </nav>
     </div>
@@ -132,7 +170,30 @@ const emits = defineEmits([
   'onRecordStarted',
   'onRecordEnded',
   'onCancelRecording',
+  'onRotateStart',
+  'onRotateEnd',
 ])
+
+const activeRotatePointerId = ref(null)
+
+const startRotate = (direction, event) => {
+  activeRotatePointerId.value = event.pointerId
+  if (event.currentTarget?.setPointerCapture) {
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch (e) {
+      // ignore
+    }
+  }
+  emits('onRotateStart', direction)
+}
+
+const stopRotate = (event) => {
+  if (activeRotatePointerId.value === null) return
+  if (event.pointerId !== activeRotatePointerId.value) return
+  activeRotatePointerId.value = null
+  emits('onRotateEnd')
+}
 const recordingReady = ref(false)
 const recording = ref(false)
 const recordingEnded = ref(false)
