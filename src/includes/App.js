@@ -18,7 +18,7 @@ class App {
     this.gltfLoader = null
     this.markerConfigs = [
       { file: '/models/train.glb', clipIndex: 0 }, // 0: 60 YEARS logo
-      { file: '/models/indonesian-map.glb', clipIndex: 0 }, // 1: Indonesia map
+      { file: '/models/indonesian-map.glb', clipIndex: 0, baked: true }, // 1: Indonesia map
       { file: '/models/bp-jacket.glb', clipIndex: 0, baked: true }, // 2: Square pattern
       { file: '/models/train.glb', clipIndex: 0 }, // 3: Tag / container
       { file: '/models/train.glb', clipIndex: 0 }, // 4: CO2
@@ -96,23 +96,31 @@ class App {
         model.traverse((child) => {
           if (!child.isMesh) return
 
-          if (child.material?.map) {
-            child.material.map.colorSpace = THREE.SRGBColorSpace
+          const fixMaterial = (src) => {
+            if (!src) return src
+
+            if (src.map) src.map.colorSpace = THREE.SRGBColorSpace
+            if (src.emissiveMap) src.emissiveMap.colorSpace = THREE.SRGBColorSpace
+
+            if (config.baked) {
+              return new THREE.MeshBasicMaterial({
+                map: src.map ?? null,
+                color: src.color ? src.color.clone() : new THREE.Color(0xffffff),
+                alphaMap: src.alphaMap ?? null,
+                transparent: src.transparent ?? false,
+                opacity: src.opacity ?? 1,
+                side: src.side ?? THREE.FrontSide,
+              })
+            }
+
+            src.envMapIntensity = 1
+            src.needsUpdate = true
+            return src
           }
 
-          if (config.baked) {
-            const src = child.material
-            child.material = new THREE.MeshBasicMaterial({
-              map: src.map ?? null,
-              alphaMap: src.alphaMap ?? null,
-              transparent: src.transparent ?? false,
-              opacity: src.opacity ?? 1,
-              side: src.side ?? THREE.FrontSide,
-            })
-          } else {
-            child.material.envMap = this.neutralEnvironment
-            child.material.needsUpdate = true
-          }
+          child.material = Array.isArray(child.material)
+            ? child.material.map(fixMaterial)
+            : fixMaterial(child.material)
         })
 
         const mixer = new THREE.AnimationMixer(model)
@@ -162,17 +170,17 @@ class App {
 
     this.neutralEnvironment = pmremGenerator.fromScene(new RoomEnvironment()).texture
     this.scene.environment = this.neutralEnvironment
-    this.renderer.toneMapping = THREE.LinearToneMapping
-    this.renderer.toneMappingExposure = 1
-    this.scene.environment.needsUpdate = true
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.2
 
     const light = new THREE.DirectionalLight(0xffffff, 1.6)
     light.position.set(0, 1, 3)
-    light.lookAt(0, 0, 0)
     this.scene.add(light)
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.9)
     this.scene.add(ambientLight)
+
+    pmremGenerator.dispose()
   }
 
   addControl() {
