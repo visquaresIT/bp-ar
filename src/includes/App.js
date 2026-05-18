@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { Water } from 'three/examples/jsm/objects/Water.js'
 import { MindARThree } from 'mind-ar/dist/mindar-image-three.prod.js'
+import { markerConfigs, BP_JACKET_INDEX, SHIP_OCEAN_INDEX } from './markerConfigs.js'
 
 class App {
   constructor() {
@@ -17,15 +18,7 @@ class App {
     this.neutralEnvironment = null
 
     this.gltfLoader = null
-    this.markerConfigs = [
-      { file: '/models/train.glb', clipIndex: 0 }, // 0: 60 YEARS logo
-      { file: '/models/indonesian-map.glb', clipIndex: 0, baked: true }, // 1: Indonesia map
-      { file: '/models/bp-jacket.glb', clipIndex: 0, baked: true }, // 2: Square pattern
-      { file: '/models/ship-ocean.glb', clipIndex: 0, baked: true }, // 3: Tag / container
-      { file: '/models/train.glb', clipIndex: 0 }, // 4: CO2
-      { file: '/models/train.glb', clipIndex: 0 }, // 5: Bor
-      { file: '/models/train.glb', clipIndex: 0 }, // 6: CO2 solid
-    ]
+    this.markerConfigs = markerConfigs
     this.mixers = []
 
     this.mediaRecorder = null
@@ -38,7 +31,7 @@ class App {
     this.canvasHeight = 0
     this.mindARVideo = null
 
-    this.bpJacketIndex = 2
+    this.bpJacketIndex = BP_JACKET_INDEX
     this.bpJacketModel = null
     this.bpJacketRotationY = 0
     this.bpJacketTargetFound = false
@@ -49,11 +42,11 @@ class App {
     this.manualRotateSpeed = 0.03
     this.autoRotateResumeDelay = 1500
 
-    this.shipOceanIndex = 3
+    this.shipOceanIndex = SHIP_OCEAN_INDEX
     this.shipOceanWater = null
     this.shipOceanShipParts = []
-    this.shipBobAmplitude = 0.05
-    this.shipBobSpeed = 0.0015
+    this.shipBobAmplitude = 0.24
+    this.shipBobSpeed = 0.0036
 
     this.setupDracoAndLoader()
     this.initAR()
@@ -201,11 +194,13 @@ class App {
       textureHeight: 256,
       waterNormals,
       sunDirection: new THREE.Vector3(0.5, 1, 0.2).normalize(),
-      sunColor: 0xffffff,
-      waterColor: 0x0a3d62,
-      distortionScale: 1.2,
+      sunColor: 0x001eb3,
+      waterColor: 0x004475,
+      distortionScale: 1.15,
+      alpha: 1.0,
       fog: false,
     })
+    water.material.uniforms.size.value = 10
     water.position.copy(oceanMesh.position)
     water.rotation.copy(oceanMesh.rotation)
     water.scale.copy(oceanMesh.scale)
