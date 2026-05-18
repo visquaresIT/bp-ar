@@ -28,6 +28,37 @@
           </label>
 
           <section class="mb-4">
+            <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">Camera</h2>
+            <div class="text-xs opacity-80 mb-1 break-words">
+              <span class="opacity-60">Active:</span> {{ selectedCameraLabel || '(loading…)' }}
+            </div>
+            <div class="text-xs opacity-80 mb-2 break-words">
+              <span class="opacity-60">Resolution:</span> {{ actualResolution || '—' }}
+            </div>
+            <label class="flex items-center justify-between text-xs mb-2">
+              <span class="opacity-80">Prefer standard (non ultra-wide)</span>
+              <input type="checkbox" v-model="preferStandardCamera" class="accent-emerald-500 w-4 h-4" />
+            </label>
+            <label class="block text-xs mb-2">
+              <span class="opacity-80 block mb-1">Requested resolution</span>
+              <select
+                v-model="resolutionPreset"
+                class="w-full bg-neutral-800 border border-neutral-700 rounded px-2 py-1"
+              >
+                <option v-for="key in Object.keys(RESOLUTION_PRESETS)" :key="key" :value="key">
+                  {{ key }}
+                </option>
+              </select>
+            </label>
+            <button
+              @click="restartAR"
+              class="w-full bg-neutral-700 hover:bg-neutral-600 rounded py-2 text-xs"
+            >
+              Restart AR (apply camera)
+            </button>
+          </section>
+
+          <section class="mb-4">
             <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">OneEuroFilter (live)</h2>
             <label class="block mb-2">
               <div class="flex justify-between text-xs opacity-70 mb-1">
@@ -156,6 +187,17 @@ const bpJacketActive = ref(false)
 
 const arDebugOpen = ref(false)
 const animationsEnabled = ref(false)
+const preferStandardCamera = ref(true)
+const selectedCameraLabel = ref('')
+const actualResolution = ref('')
+const RESOLUTION_PRESETS = {
+  auto: null,
+  '720p': { width: 1280, height: 720 },
+  '1080p': { width: 1920, height: 1080 },
+  '1440p': { width: 2560, height: 1440 },
+  '4K': { width: 3840, height: 2160 },
+}
+const resolutionPreset = ref('1080p')
 const trackerSettings = reactive({
   filterMinCF: 0.0001,
   filterBeta: 0.01,
@@ -180,15 +222,30 @@ const applyTrackerSettings = () => {
   app.mindArTHREE.missTolerance = trackerSettings.missTolerance
 }
 
+const applyCameraResolution = () => {
+  if (!app) return
+  app.cameraResolution = RESOLUTION_PRESETS[resolutionPreset.value]
+}
+
+const refreshActualResolution = () => {
+  const s = app?.actualCameraSettings
+  actualResolution.value = s ? `${s.width}×${s.height}` : ''
+}
+
 const restartAR = async () => {
   if (!app) return
   app.stopAR()
   applyTrackerSettings()
+  app.preferStandardCamera = preferStandardCamera.value
+  applyCameraResolution()
   await app.startAR()
+  selectedCameraLabel.value = app.selectedCameraLabel ?? ''
+  refreshActualResolution()
 }
 
 watch(trackerSettings, applyTrackerSettings, { deep: true })
 watch(animationsEnabled, (v) => { if (app) app.animationsEnabled = v })
+watch(preferStandardCamera, (v) => { if (app) app.preferStandardCamera = v })
 
 onMounted(() => {
   syncDebugHash()
@@ -245,8 +302,12 @@ const handleStart = async () => {
       bpJacketActive.value = found
     }
     app.animationsEnabled = animationsEnabled.value
+    app.preferStandardCamera = preferStandardCamera.value
+    applyCameraResolution()
     applyTrackerSettings()
     await app.startAR()
+    selectedCameraLabel.value = app.selectedCameraLabel ?? ''
+    refreshActualResolution()
 
     orientationHandler = () => {
       app.stopAR()

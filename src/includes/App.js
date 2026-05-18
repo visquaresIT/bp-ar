@@ -50,6 +50,12 @@ class App {
 
     this.animationsEnabled = false
 
+    this.selectedCameraLabel = null
+    this.selectedCameraId = null
+    this.preferStandardCamera = true
+    this.cameraResolution = { width: 1920, height: 1080 }
+    this.actualCameraSettings = null
+
     this.setupDracoAndLoader()
     this.initAR()
     this.addLight()
@@ -258,8 +264,89 @@ class App {
     }
   }
 
+  async selectBestBackCamera() {
+    if (!navigator.mediaDevices?.enumerateDevices) return null
+
+    let permissionStream = null
+    try {
+      permissionStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      })
+    } catch (e) {
+      console.warn('[camera] permission probe failed', e)
+      return null
+    }
+
+    let videoInputs = []
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      videoInputs = devices.filter((d) => d.kind === 'videoinput')
+    } finally {
+      permissionStream.getTracks().forEach((t) => t.stop())
+    }
+
+    if (videoInputs.length === 0) return null
+
+    const backCams = videoInputs.filter((d) => /back|rear|environment/i.test(d.label))
+    const pool = backCams.length ? backCams : videoInputs
+
+    const isUltra = (l) => /ultra.?wide|wide.?angle|0[.,]5x/i.test(l)
+    const isTele = (l) => /tele(photo)?|2x|3x|5x|10x/i.test(l)
+
+    const preferred = pool.find((d) => !isUltra(d.label) && !isTele(d.label))
+    const chosen = preferred ?? pool[0]
+
+    this.selectedCameraLabel = chosen.label || '(unlabeled)'
+    this.selectedCameraId = chosen.deviceId
+    console.log('[camera] selected:', this.selectedCameraLabel, 'from', videoInputs.map((d) => d.label))
+    return chosen.deviceId
+  }
+
   async startAR() {
-    await this.mindArTHREE.start()
+    let deviceId = null
+    if (this.preferStandardCamera) {
+      deviceId = await this.selectBestBackCamera()
+    }
+
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const videoCons =
+        constraints && typeof constraints.video === 'object' && constraints.video !== null
+          ? constraints.video
+          : {}
+      const mergedVideo = { ...videoCons }
+      if (this.cameraResolution?.width) {
+        mergedVideo.width = { ideal: this.cameraResolution.width }
+      }
+      if (this.cameraResolution?.height) {
+        mergedVideo.height = { ideal: this.cameraResolution.height }
+      }
+      if (deviceId) mergedVideo.deviceId = { exact: deviceId }
+      try {
+        return await original({ ...constraints, video: mergedVideo })
+      } catch (e) {
+        console.warn('[camera] preferred constraints failed, falling back', e)
+        return await original(constraints)
+      }
+    }
+
+    try {
+      await this.mindArTHREE.start()
+    } finally {
+      navigator.mediaDevices.getUserMedia = original
+    }
+
+    const track = this.mindArTHREE.video?.srcObject?.getVideoTracks?.()[0]
+    this.actualCameraSettings = track?.getSettings?.() ?? null
+    if (this.actualCameraSettings) {
+      console.log(
+        '[camera] active stream:',
+        `${this.actualCameraSettings.width}x${this.actualCameraSettings.height}`,
+        this.actualCameraSettings,
+      )
+    }
+
     this.updateFrame()
   }
 
