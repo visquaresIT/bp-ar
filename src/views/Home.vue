@@ -186,7 +186,7 @@ const welcomeError = ref('')
 const bpJacketActive = ref(false)
 
 const arDebugOpen = ref(false)
-const animationsEnabled = ref(false)
+const animationsEnabled = ref(true)
 const preferStandardCamera = ref(true)
 const selectedCameraLabel = ref('')
 const actualResolution = ref('')

@@ -38,15 +38,15 @@
       </section>
 
       <section v-if="isShipOcean && current.ocean" class="mb-4">
-        <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">Ocean (Water shader)</h2>
-        <SliderRow label="Distortion" v-model.number="current.ocean.distortionScale" :min="0" :max="10" :step="0.05" />
-        <SliderRow label="Alpha" v-model.number="current.ocean.alpha" :min="0" :max="1" :step="0.01" />
-        <SliderRow label="Size" v-model.number="current.ocean.size" :min="0.1" :max="10" :step="0.1" />
-        <ColorRow label="Water Color" v-model="current.ocean.waterColor" />
-        <ColorRow label="Sun Color" v-model="current.ocean.sunColor" />
-        <SliderRow label="Sun X" v-model.number="current.ocean.sunDirection.x" :min="-1" :max="1" :step="0.01" />
-        <SliderRow label="Sun Y" v-model.number="current.ocean.sunDirection.y" :min="-1" :max="1" :step="0.01" />
-        <SliderRow label="Sun Z" v-model.number="current.ocean.sunDirection.z" :min="-1" :max="1" :step="0.01" />
+        <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">Ocean (env reflection)</h2>
+        <ColorRow label="Color" v-model="current.ocean.color" />
+        <SliderRow label="Metalness" v-model.number="current.ocean.metalness" :min="0" :max="1" :step="0.01" />
+        <SliderRow label="Roughness" v-model.number="current.ocean.roughness" :min="0" :max="1" :step="0.01" />
+        <SliderRow label="Normal Scale" v-model.number="current.ocean.normalScale" :min="0" :max="5" :step="0.05" />
+        <SliderRow label="Opacity" v-model.number="current.ocean.opacity" :min="0" :max="1" :step="0.01" />
+        <SliderRow label="Normal Repeat" v-model.number="current.ocean.normalRepeat" :min="0.5" :max="20" :step="0.5" />
+        <SliderRow label="Scroll X" v-model.number="current.ocean.scrollSpeedX" :min="-0.5" :max="0.5" :step="0.005" />
+        <SliderRow label="Scroll Y" v-model.number="current.ocean.scrollSpeedY" :min="-0.5" :max="0.5" :step="0.005" />
       </section>
 
       <section v-if="isShipOcean && current.buoyancy" class="mb-4">
@@ -88,12 +88,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
-import { Water } from 'three/examples/jsm/objects/Water.js'
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, h } from 'vue'
 import { RouterLink } from 'vue-router'
 import { markerConfigs, BP_JACKET_INDEX, SHIP_OCEAN_INDEX } from '../includes/markerConfigs.js'
 
-const STORAGE_KEY = 'bp-ar:debug:v1'
+const STORAGE_KEY = 'bp-ar:debug:v2'
 const WATER_NORMALS_URL = 'https://threejs.org/examples/textures/waternormals.jpg'
 
 const SliderRow = {
@@ -156,12 +155,14 @@ function defaultStateFor(index) {
   }
   if (index === SHIP_OCEAN_INDEX) {
     base.ocean = {
-      distortionScale: 1.2,
-      alpha: 1.0,
-      size: 1.0,
-      waterColor: '#0a3d62',
-      sunColor: '#ffffff',
-      sunDirection: { x: 0.5, y: 1.0, z: 0.2 },
+      color: '#004475',
+      metalness: 1.0,
+      roughness: 0.15,
+      normalScale: 1.5,
+      opacity: 1.0,
+      normalRepeat: 4.0,
+      scrollSpeedX: 0.03,
+      scrollSpeedY: 0.02,
     }
     base.buoyancy = { amplitude: 0.05, speed: 0.0015 }
   }
@@ -205,7 +206,7 @@ function saveStates() {
 
 let renderer, scene, camera, controls, mixer
 let currentModel = null
-let waterMesh = null
+let oceanMesh = null
 let shipParts = []
 let clock = new THREE.Clock()
 let raf = null
@@ -224,11 +225,7 @@ function clearScene() {
     })
     currentModel = null
   }
-  if (waterMesh) {
-    scene.remove(waterMesh)
-    waterMesh.material?.dispose?.()
-    waterMesh = null
-  }
+  oceanMesh = null
   shipParts = []
   mixer = null
 }
@@ -303,42 +300,39 @@ function loadModel(index) {
 }
 
 function setupShipOcean(model) {
-  let oceanMesh = null
+  let foundOcean = null
   const parts = []
   model.traverse((child) => {
     if (!child.isMesh) return
-    if (/ocean|water|sea/i.test(child.name)) oceanMesh = child
+    if (/ocean|water|sea/i.test(child.name)) foundOcean = child
     else parts.push(child)
   })
   shipParts = parts.map((obj) => ({ obj, baseY: obj.position.y }))
 
-  if (!oceanMesh) {
+  if (!foundOcean) {
     const names = []
     model.traverse((c) => { if (c.isMesh) names.push(c.name) })
     console.warn('[debug ship-ocean] no ocean mesh; names:', names)
     return
   }
 
-  const waterNormals = new THREE.TextureLoader().load(WATER_NORMALS_URL, (tex) => {
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-  })
+  const waterNormals = new THREE.TextureLoader().load(WATER_NORMALS_URL)
+  waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping
+  waterNormals.repeat.set(4, 4)
 
-  const water = new Water(oceanMesh.geometry, {
-    textureWidth: 256,
-    textureHeight: 256,
-    waterNormals,
-    sunDirection: new THREE.Vector3(0.5, 1, 0.2).normalize(),
-    sunColor: 0xffffff,
-    waterColor: 0x0a3d62,
-    distortionScale: 1.2,
-    fog: false,
+  const oldMaterial = foundOcean.material
+  foundOcean.material = new THREE.MeshStandardMaterial({
+    color: 0x004475,
+    metalness: 1.0,
+    roughness: 0.15,
+    normalMap: waterNormals,
+    normalScale: new THREE.Vector2(1.5, 1.5),
+    envMapIntensity: 1.0,
   })
-  water.position.copy(oceanMesh.position)
-  water.rotation.copy(oceanMesh.rotation)
-  water.scale.copy(oceanMesh.scale)
-  oceanMesh.parent.add(water)
-  oceanMesh.parent.remove(oceanMesh)
-  waterMesh = water
+  if (Array.isArray(oldMaterial)) oldMaterial.forEach((m) => m?.dispose?.())
+  else oldMaterial?.dispose?.()
+
+  oceanMesh = foundOcean
 }
 
 function applyState() {
@@ -349,14 +343,16 @@ function applyState() {
     currentModel.rotation.set(s.rotation.x, s.rotation.y, s.rotation.z)
     currentModel.scale.setScalar(s.scale)
   }
-  if (waterMesh && s.ocean) {
-    const u = waterMesh.material.uniforms
-    u.distortionScale.value = s.ocean.distortionScale
-    u.alpha.value = s.ocean.alpha
-    u.size.value = s.ocean.size
-    u.waterColor.value.set(s.ocean.waterColor)
-    u.sunColor.value.set(s.ocean.sunColor)
-    u.sunDirection.value.set(s.ocean.sunDirection.x, s.ocean.sunDirection.y, s.ocean.sunDirection.z).normalize()
+  if (oceanMesh && s.ocean) {
+    const mat = oceanMesh.material
+    mat.color.set(s.ocean.color)
+    mat.metalness = s.ocean.metalness
+    mat.roughness = s.ocean.roughness
+    mat.normalScale.set(s.ocean.normalScale, s.ocean.normalScale)
+    mat.opacity = s.ocean.opacity
+    mat.transparent = s.ocean.opacity < 1
+    if (mat.normalMap) mat.normalMap.repeat.set(s.ocean.normalRepeat, s.ocean.normalRepeat)
+    mat.needsUpdate = true
   }
 }
 
@@ -432,7 +428,11 @@ function animate() {
 
   if (mixer) mixer.update(dt * 0.6)
 
-  if (waterMesh) waterMesh.material.uniforms.time.value += dt
+  if (oceanMesh?.material?.normalMap && current.value?.ocean) {
+    const nm = oceanMesh.material.normalMap
+    nm.offset.x = (nm.offset.x + dt * current.value.ocean.scrollSpeedX) % 1
+    nm.offset.y = (nm.offset.y + dt * current.value.ocean.scrollSpeedY) % 1
+  }
 
   if (shipParts.length && current.value?.buoyancy) {
     const { amplitude, speed } = current.value.buoyancy

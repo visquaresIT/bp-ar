@@ -2,7 +2,6 @@ import * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
-import { Water } from 'three/examples/jsm/objects/Water.js'
 import { MindARThree } from 'mind-ar/dist/mindar-image-three.prod.js'
 import { markerConfigs, BP_JACKET_INDEX, SHIP_OCEAN_INDEX } from './markerConfigs.js'
 
@@ -43,12 +42,13 @@ class App {
     this.autoRotateResumeDelay = 1500
 
     this.shipOceanIndex = SHIP_OCEAN_INDEX
-    this.shipOceanWater = null
+    this.shipOceanMesh = null
     this.shipOceanShipParts = []
-    this.shipBobAmplitude = 0.24
-    this.shipBobSpeed = 0.0036
+    this.shipBobAmplitude = 0.28
+    this.shipBobSpeed = 0
+    this.oceanScrollSpeed = { x: 0.025, y: 0.02 }
 
-    this.animationsEnabled = false
+    this.animationsEnabled = true
 
     this.selectedCameraLabel = null
     this.selectedCameraId = null
@@ -194,30 +194,23 @@ class App {
 
     const waterNormals = new THREE.TextureLoader().load(
       'https://threejs.org/examples/textures/waternormals.jpg',
-      (tex) => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping },
     )
+    waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping
+    waterNormals.repeat.set(3, 3)
 
-    const water = new Water(oceanMesh.geometry, {
-      textureWidth: 256,
-      textureHeight: 256,
-      waterNormals,
-      sunDirection: new THREE.Vector3(0.5, 1, 0.2).normalize(),
-      sunColor: 0x001eb3,
-      waterColor: 0x004475,
-      distortionScale: 1.15,
-      alpha: 1.0,
-      fog: false,
+    const oldMaterial = oceanMesh.material
+    oceanMesh.material = new THREE.MeshStandardMaterial({
+      color: 0x004475,
+      metalness: 0.35,
+      roughness: 0.24,
+      normalMap: waterNormals,
+      normalScale: new THREE.Vector2(0.4, 0.4),
+      envMapIntensity: 1.0,
     })
-    water.material.uniforms.size.value = 10
-    water.position.copy(oceanMesh.position)
-    water.rotation.copy(oceanMesh.rotation)
-    water.scale.copy(oceanMesh.scale)
-    water.renderOrder = oceanMesh.renderOrder
+    if (Array.isArray(oldMaterial)) oldMaterial.forEach((m) => m?.dispose?.())
+    else oldMaterial?.dispose?.()
 
-    oceanMesh.parent.add(water)
-    oceanMesh.parent.remove(oceanMesh)
-
-    this.shipOceanWater = water
+    this.shipOceanMesh = oceanMesh
     this.shipOceanShipParts = shipParts.map((obj) => ({ obj, baseY: obj.position.y }))
   }
 
@@ -364,14 +357,19 @@ class App {
     let deltaTime = 0
 
     this.renderer.setAnimationLoop((time) => {
-      deltaTime = ((time - previousTime) / 1000) * configParam.animationSpeed
+      const rawDelta = (time - previousTime) / 1000
+      deltaTime = rawDelta * configParam.animationSpeed
       previousTime = time
 
       if (this.animationsEnabled) {
         this.mixers.forEach((mixer) => mixer && mixer.update(deltaTime))
 
-        if (this.shipOceanWater) {
-          this.shipOceanWater.material.uniforms['time'].value += deltaTime
+        if (this.shipOceanMesh) {
+          const nm = this.shipOceanMesh.material.normalMap
+          if (nm) {
+            nm.offset.x = (nm.offset.x + rawDelta * this.oceanScrollSpeed.x) % 1
+            nm.offset.y = (nm.offset.y + rawDelta * this.oceanScrollSpeed.y) % 1
+          }
         }
 
         if (this.shipOceanShipParts.length > 0) {

@@ -1,5 +1,5 @@
 export const markerConfigs = [
-  { file: '/models/train.glb', clipIndex: 0 }, // 0: 60 YEARS logo
+  { file: '/models/castrol.glb', clipIndex: 0, baked: true  }, // 0: 60 YEARS logo
   { file: '/models/indonesian-map.glb', clipIndex: 0, baked: true }, // 1: Indonesia map
   { file: '/models/bp-jacket.glb', clipIndex: 0, baked: true }, // 2: Square pattern
   { file: '/models/ship-ocean.glb', clipIndex: 0, baked: true }, // 3: Tag / container
