@@ -13,6 +13,17 @@
 
     <Transition name="ar-ui">
       <div v-if="started" class="ar-ui">
+        <img
+          src="/60-bp.svg"
+          alt="60 Years"
+          class="fixed top-4 left-4 w-16 z-40 pointer-events-none drop-shadow-md"
+        />
+        <img
+          src="/logo.svg"
+          alt="BP"
+          class="fixed top-4 right-4 w-16 z-40 pointer-events-none drop-shadow-md"
+        />
+
         <aside
           v-if="arDebugOpen"
           class="fixed top-0 left-0 h-full w-72 bg-neutral-900/90 backdrop-blur text-white p-4 overflow-y-auto text-sm shadow-2xl border-r border-neutral-700 z-[60]"
@@ -374,6 +385,7 @@ const capture = async () => {
 
   modelImage.onload = () => {
     context.drawImage(modelImage, 0, 0, screenWidth, screenHeight)
+    app.drawWatermarks(context, canvas.width, canvas.height)
     capturedImage.value = canvas.toDataURL()
 
     try {

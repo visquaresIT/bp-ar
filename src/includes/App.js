@@ -52,11 +52,52 @@ class App {
     this.cameraResolution = { width: 1920, height: 1080 }
     this.actualCameraSettings = null
 
+    this.watermarks = { topLeft: null, topRight: null }
+
     this.setupDracoAndLoader()
+    this.setupWatermarks()
     this.initAR()
     this.addLight()
     this.addModel()
     this.addControl()
+  }
+
+  setupWatermarks() {
+    const load = (src) =>
+      new Promise((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = () => resolve(null)
+        img.src = src
+      })
+    Promise.all([load('/60-bp.svg'), load('/logo.svg')]).then(([tl, tr]) => {
+      this.watermarks.topLeft = tl
+      this.watermarks.topRight = tr
+    })
+  }
+
+  drawWatermarks(ctx, canvasW, canvasH) {
+    const scale = canvasW / window.innerWidth || 1
+    const margin = 16 * scale
+    const targetW = 64 * scale
+
+    const stamp = (img, x, y) => {
+      if (!img || !img.naturalWidth) return
+      const aspect = img.naturalWidth / img.naturalHeight
+      const w = targetW
+      const h = targetW / aspect
+      ctx.drawImage(img, x, y, w, h)
+    }
+
+    stamp(this.watermarks.topLeft, margin, margin)
+
+    const tr = this.watermarks.topRight
+    if (tr && tr.naturalWidth) {
+      const aspect = tr.naturalWidth / tr.naturalHeight
+      const w = targetW
+      ctx.drawImage(tr, canvasW - margin - w, margin, w, w / aspect)
+    }
   }
 
   initAR() {
@@ -497,6 +538,8 @@ class App {
       )
 
       ctx.drawImage(webGLCanvas, 0, 0, canvas.width, canvas.height)
+
+      this.drawWatermarks(ctx, canvas.width, canvas.height)
 
       if (this.mediaRecorder.state === 'recording') {
         requestAnimationFrame(render)
