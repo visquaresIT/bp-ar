@@ -1,6 +1,7 @@
 <template>
   <!-- Rotate Left Button (left side, vertically centered) -->
   <button
+    v-if="showRotate"
     @pointerdown="startRotate(-1, $event)"
     @pointerup="stopRotate($event)"
     @pointercancel="stopRotate($event)"
@@ -25,6 +26,7 @@
 
   <!-- Rotate Right Button (right side, vertically centered) -->
   <button
+    v-if="showRotate"
     @pointerdown="startRotate(1, $event)"
     @pointerup="stopRotate($event)"
     @pointercancel="stopRotate($event)"
@@ -81,7 +83,7 @@
           :class="
             !recording && !recordingReady
               ? 'opacity-100'
-              : 'opacity-0 pointer-events-none'
+              : 'opacity-20 pointer-events-none'
           "
           class="transition-opacity duration-300 w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex flex-col items-center justify-center"
         >
@@ -163,6 +165,13 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+
+defineProps({
+  showRotate: {
+    type: Boolean,
+    default: false,
+  },
+})
 
 const emits = defineEmits([
   'onInitCapture',

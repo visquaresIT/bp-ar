@@ -42,6 +42,7 @@ class App {
     this.bpJacketModel = null
     this.bpJacketRotationY = 0
     this.bpJacketTargetFound = false
+    this.onBpJacketTargetChanged = null
     this.manualRotateDirection = 0
     this.lastInteractionTime = 0
     this.autoRotateSpeed = 0.01
@@ -160,10 +161,12 @@ class App {
     if (bpAnchor) {
       bpAnchor.onTargetFound = () => {
         this.bpJacketTargetFound = true
+        this.onBpJacketTargetChanged?.(true)
       }
       bpAnchor.onTargetLost = () => {
         this.bpJacketTargetFound = false
         this.manualRotateDirection = 0
+        this.onBpJacketTargetChanged?.(false)
       }
     }
   }

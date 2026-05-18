@@ -15,6 +15,7 @@
       <div v-if="started" class="ar-ui">
         <Controls
           v-if="!capturing"
+          :show-rotate="bpJacketActive"
           @onInitCapture="initCapture()"
           @onRecordStarted="startRecording()"
           @onRecordEnded="stopRecording()"
@@ -58,6 +59,7 @@ const openVideoView = ref(false)
 const started = ref(false)
 const starting = ref(false)
 const welcomeError = ref('')
+const bpJacketActive = ref(false)
 
 let video
 let app
@@ -105,6 +107,9 @@ const handleStart = async () => {
     await nextTick()
 
     app = new App()
+    app.onBpJacketTargetChanged = (found) => {
+      bpJacketActive.value = found
+    }
     await app.startAR()
 
     orientationHandler = () => {
