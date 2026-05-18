@@ -1,4 +1,52 @@
 <template>
+  <!-- Rotate Left Button (left side, vertically centered) -->
+  <button
+    @pointerdown="startRotate(-1, $event)"
+    @pointerup="stopRotate($event)"
+    @pointercancel="stopRotate($event)"
+    @pointerleave="stopRotate($event)"
+    class="fixed left-4 top-1/2 -translate-y-1/2 z-50 w-12 h-12 shadow-md bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex items-center justify-center select-none touch-none"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke-width="1.5"
+      stroke="currentColor"
+      class="size-6"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
+      />
+    </svg>
+  </button>
+
+  <!-- Rotate Right Button (right side, vertically centered) -->
+  <button
+    @pointerdown="startRotate(1, $event)"
+    @pointerup="stopRotate($event)"
+    @pointercancel="stopRotate($event)"
+    @pointerleave="stopRotate($event)"
+    class="fixed right-4 top-1/2 -translate-y-1/2 z-50 w-12 h-12 shadow-md bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex items-center justify-center select-none touch-none"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke-width="1.5"
+      stroke="currentColor"
+      class="size-6"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3"
+      />
+    </svg>
+  </button>
+
   <div id="control" class="fixed bottom-6 left-0 w-full h-16 z-50">
     <Transition>
       <div v-if="recordingReady && !recording" class="absolute w-full flex justify-center -top-12">
@@ -25,32 +73,8 @@
     </Transition>
     <div class="max-w-screen-sm mx-auto px-6 flex justify-center">
       <nav
-        class="w-[14.6rem] shadow-md flex justify-center items-center gap-2 p-2 bg-white rounded-full relative"
+        class="shadow-md flex justify-center items-center gap-2 p-2 bg-white rounded-full relative"
       >
-        <!-- Rotate Left Button -->
-        <button
-          @pointerdown="startRotate(-1, $event)"
-          @pointerup="stopRotate($event)"
-          @pointercancel="stopRotate($event)"
-          @pointerleave="stopRotate($event)"
-          class="w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex items-center justify-center select-none touch-none"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
-            />
-          </svg>
-        </button>
-
         <!-- Capture Image Button -->
         <button
           @click="initCapture"
@@ -128,30 +152,6 @@
             <div v-else class="size-5 rounded-full bg-white"></div>
           </button>
         </div>
-
-        <!-- Rotate Right Button -->
-        <button
-          @pointerdown="startRotate(1, $event)"
-          @pointerup="stopRotate($event)"
-          @pointercancel="stopRotate($event)"
-          @pointerleave="stopRotate($event)"
-          class="w-12 h-12 bg-[#1C9B48] hover:bg-[#178a3f] text-white rounded-full flex items-center justify-center select-none touch-none"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3"
-            />
-          </svg>
-        </button>
       </nav>
     </div>
     <div class="hidden">

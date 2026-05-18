@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { Water } from 'three/examples/jsm/objects/Water.js'
 import { MindARThree } from 'mind-ar/dist/mindar-image-three.prod.js'
 
 class App {
@@ -20,7 +21,7 @@ class App {
       { file: '/models/train.glb', clipIndex: 0 }, // 0: 60 YEARS logo
       { file: '/models/indonesian-map.glb', clipIndex: 0, baked: true }, // 1: Indonesia map
       { file: '/models/bp-jacket.glb', clipIndex: 0, baked: true }, // 2: Square pattern
-      { file: '/models/train.glb', clipIndex: 0 }, // 3: Tag / container
+      { file: '/models/ship-ocean.glb', clipIndex: 0, baked: true }, // 3: Tag / container
       { file: '/models/train.glb', clipIndex: 0 }, // 4: CO2
       { file: '/models/train.glb', clipIndex: 0 }, // 5: Bor
       { file: '/models/train.glb', clipIndex: 0 }, // 6: CO2 solid
@@ -46,6 +47,12 @@ class App {
     this.autoRotateSpeed = 0.01
     this.manualRotateSpeed = 0.03
     this.autoRotateResumeDelay = 1500
+
+    this.shipOceanIndex = 3
+    this.shipOceanWater = null
+    this.shipOceanShipParts = []
+    this.shipBobAmplitude = 0.05
+    this.shipBobSpeed = 0.0015
 
     this.setupDracoAndLoader()
     this.initAR()
@@ -123,6 +130,10 @@ class App {
             : fixMaterial(child.material)
         })
 
+        if (index === this.shipOceanIndex) {
+          this.setupShipOcean(model)
+        }
+
         const mixer = new THREE.AnimationMixer(model)
         const clips = gltf.animations || []
 
@@ -155,6 +166,53 @@ class App {
         this.manualRotateDirection = 0
       }
     }
+  }
+
+  setupShipOcean(model) {
+    let oceanMesh = null
+    const shipParts = []
+
+    model.traverse((child) => {
+      if (!child.isMesh) return
+      if (/ocean|water|sea/i.test(child.name)) {
+        oceanMesh = child
+      } else {
+        shipParts.push(child)
+      }
+    })
+
+    if (!oceanMesh) {
+      const names = []
+      model.traverse((c) => { if (c.isMesh) names.push(c.name) })
+      console.warn('[ship-ocean] no ocean mesh found; child mesh names:', names)
+      return
+    }
+
+    const waterNormals = new THREE.TextureLoader().load(
+      'https://threejs.org/examples/textures/waternormals.jpg',
+      (tex) => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping },
+    )
+
+    const water = new Water(oceanMesh.geometry, {
+      textureWidth: 256,
+      textureHeight: 256,
+      waterNormals,
+      sunDirection: new THREE.Vector3(0.5, 1, 0.2).normalize(),
+      sunColor: 0xffffff,
+      waterColor: 0x0a3d62,
+      distortionScale: 1.2,
+      fog: false,
+    })
+    water.position.copy(oceanMesh.position)
+    water.rotation.copy(oceanMesh.rotation)
+    water.scale.copy(oceanMesh.scale)
+    water.renderOrder = oceanMesh.renderOrder
+
+    oceanMesh.parent.add(water)
+    oceanMesh.parent.remove(oceanMesh)
+
+    this.shipOceanWater = water
+    this.shipOceanShipParts = shipParts.map((obj) => ({ obj, baseY: obj.position.y }))
   }
 
   setBpJacketRotation(direction) {
@@ -223,6 +281,17 @@ class App {
       previousTime = time
 
       this.mixers.forEach((mixer) => mixer && mixer.update(deltaTime))
+
+      if (this.shipOceanWater) {
+        this.shipOceanWater.material.uniforms['time'].value += deltaTime
+      }
+
+      if (this.shipOceanShipParts.length > 0) {
+        const bob = Math.sin(time * this.shipBobSpeed) * this.shipBobAmplitude
+        for (const part of this.shipOceanShipParts) {
+          part.obj.position.y = part.baseY + bob
+        }
+      }
 
       if (this.bpJacketModel && this.bpJacketTargetFound) {
         if (this.manualRotateDirection !== 0) {
