@@ -200,7 +200,7 @@ class App {
 
     const oldMaterial = oceanMesh.material
     oceanMesh.material = new THREE.MeshStandardMaterial({
-      color: 0x004475,
+      color: 0x00365c,
       metalness: 0.35,
       roughness: 0.24,
       normalMap: waterNormals,

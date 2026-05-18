@@ -155,7 +155,7 @@ function defaultStateFor(index) {
   }
   if (index === SHIP_OCEAN_INDEX) {
     base.ocean = {
-      color: '#004475',
+      color: '#00365c',
       metalness: 1.0,
       roughness: 0.15,
       normalScale: 1.5,
@@ -322,7 +322,7 @@ function setupShipOcean(model) {
 
   const oldMaterial = foundOcean.material
   foundOcean.material = new THREE.MeshStandardMaterial({
-    color: 0x004475,
+    color: 0x00365c,
     metalness: 1.0,
     roughness: 0.15,
     normalMap: waterNormals,
