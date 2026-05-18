@@ -13,6 +13,98 @@
 
     <Transition name="ar-ui">
       <div v-if="started" class="ar-ui">
+        <aside
+          v-if="arDebugOpen"
+          class="fixed top-0 left-0 h-full w-72 bg-neutral-900/90 backdrop-blur text-white p-4 overflow-y-auto text-sm shadow-2xl border-r border-neutral-700 z-[60]"
+        >
+          <div class="flex items-center justify-between mb-3">
+            <h1 class="font-semibold">AR Tracker Debug</h1>
+            <button @click="closeArDebug" class="text-xs opacity-70 hover:opacity-100">✕</button>
+          </div>
+
+          <label class="flex items-center justify-between mb-3 text-xs">
+            <span class="opacity-80">Animations</span>
+            <input type="checkbox" v-model="animationsEnabled" class="accent-emerald-500 w-4 h-4" />
+          </label>
+
+          <section class="mb-4">
+            <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">OneEuroFilter (live)</h2>
+            <label class="block mb-2">
+              <div class="flex justify-between text-xs opacity-70 mb-1">
+                <span>filterMinCF</span>
+                <span class="tabular-nums">{{ trackerSettings.filterMinCF.toFixed(5) }}</span>
+              </div>
+              <input
+                type="range"
+                v-model.number="trackerSettings.filterMinCF"
+                min="0.00001"
+                max="0.01"
+                step="0.00001"
+                class="w-full accent-emerald-500"
+              />
+            </label>
+            <label class="block mb-2">
+              <div class="flex justify-between text-xs opacity-70 mb-1">
+                <span>filterBeta</span>
+                <span class="tabular-nums">{{ trackerSettings.filterBeta.toFixed(4) }}</span>
+              </div>
+              <input
+                type="range"
+                v-model.number="trackerSettings.filterBeta"
+                min="0.001"
+                max="1"
+                step="0.001"
+                class="w-full accent-emerald-500"
+              />
+            </label>
+          </section>
+
+          <section class="mb-4">
+            <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">Detection (restart to apply)</h2>
+            <label class="block mb-2">
+              <div class="flex justify-between text-xs opacity-70 mb-1">
+                <span>warmupTolerance</span>
+                <span class="tabular-nums">{{ trackerSettings.warmupTolerance }}</span>
+              </div>
+              <input
+                type="range"
+                v-model.number="trackerSettings.warmupTolerance"
+                min="0"
+                max="20"
+                step="1"
+                class="w-full accent-emerald-500"
+              />
+            </label>
+            <label class="block mb-2">
+              <div class="flex justify-between text-xs opacity-70 mb-1">
+                <span>missTolerance</span>
+                <span class="tabular-nums">{{ trackerSettings.missTolerance }}</span>
+              </div>
+              <input
+                type="range"
+                v-model.number="trackerSettings.missTolerance"
+                min="0"
+                max="20"
+                step="1"
+                class="w-full accent-emerald-500"
+              />
+            </label>
+            <button
+              @click="restartAR"
+              class="w-full mt-2 bg-neutral-700 hover:bg-neutral-600 rounded py-2 text-xs"
+            >
+              Restart AR
+            </button>
+          </section>
+
+          <RouterLink
+            to="/debug"
+            class="block text-center bg-emerald-600 hover:bg-emerald-500 rounded py-2 text-xs font-medium"
+          >
+            Open Model Debugger →
+          </RouterLink>
+        </aside>
+
         <Controls
           v-if="!capturing"
           :show-rotate="bpJacketActive"
@@ -45,7 +137,8 @@ import Controls from '../components/Controls.vue'
 import CaptureImage from '../components/CaptureImage.vue'
 import CaptureVideo from '../components/CaptureVideo.vue'
 import WelcomeScreen from '../components/WelcomeScreen.vue'
-import { onBeforeUnmount, ref, watch, nextTick } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref, watch, nextTick } from 'vue'
+import { RouterLink } from 'vue-router'
 
 const openCapture = ref(false)
 const arApp = ref(null)
@@ -60,6 +153,47 @@ const started = ref(false)
 const starting = ref(false)
 const welcomeError = ref('')
 const bpJacketActive = ref(false)
+
+const arDebugOpen = ref(false)
+const animationsEnabled = ref(false)
+const trackerSettings = reactive({
+  filterMinCF: 0.0001,
+  filterBeta: 0.01,
+  warmupTolerance: 5,
+  missTolerance: 5,
+})
+
+const syncDebugHash = () => {
+  arDebugOpen.value = window.location.hash === '#debug'
+}
+
+const closeArDebug = () => {
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+  arDebugOpen.value = false
+}
+
+const applyTrackerSettings = () => {
+  if (!app?.mindArTHREE) return
+  app.mindArTHREE.filterMinCF = trackerSettings.filterMinCF
+  app.mindArTHREE.filterBeta = trackerSettings.filterBeta
+  app.mindArTHREE.warmupTolerance = trackerSettings.warmupTolerance
+  app.mindArTHREE.missTolerance = trackerSettings.missTolerance
+}
+
+const restartAR = async () => {
+  if (!app) return
+  app.stopAR()
+  applyTrackerSettings()
+  await app.startAR()
+}
+
+watch(trackerSettings, applyTrackerSettings, { deep: true })
+watch(animationsEnabled, (v) => { if (app) app.animationsEnabled = v })
+
+onMounted(() => {
+  syncDebugHash()
+  window.addEventListener('hashchange', syncDebugHash)
+})
 
 let video
 let app
@@ -110,6 +244,8 @@ const handleStart = async () => {
     app.onBpJacketTargetChanged = (found) => {
       bpJacketActive.value = found
     }
+    app.animationsEnabled = animationsEnabled.value
+    applyTrackerSettings()
     await app.startAR()
 
     orientationHandler = () => {
@@ -234,6 +370,7 @@ watch(
 onBeforeUnmount(() => {
   if (captureTimeout.value) clearTimeout(captureTimeout.value)
   if (orientationHandler) window.removeEventListener('orientationchange', orientationHandler)
+  window.removeEventListener('hashchange', syncDebugHash)
   if (app) app.stopAR()
 })
 </script>

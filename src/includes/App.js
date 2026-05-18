@@ -48,6 +48,8 @@ class App {
     this.shipBobAmplitude = 0.24
     this.shipBobSpeed = 0.0036
 
+    this.animationsEnabled = false
+
     this.setupDracoAndLoader()
     this.initAR()
     this.addLight()
@@ -278,16 +280,18 @@ class App {
       deltaTime = ((time - previousTime) / 1000) * configParam.animationSpeed
       previousTime = time
 
-      this.mixers.forEach((mixer) => mixer && mixer.update(deltaTime))
+      if (this.animationsEnabled) {
+        this.mixers.forEach((mixer) => mixer && mixer.update(deltaTime))
 
-      if (this.shipOceanWater) {
-        this.shipOceanWater.material.uniforms['time'].value += deltaTime
-      }
+        if (this.shipOceanWater) {
+          this.shipOceanWater.material.uniforms['time'].value += deltaTime
+        }
 
-      if (this.shipOceanShipParts.length > 0) {
-        const bob = Math.sin(time * this.shipBobSpeed) * this.shipBobAmplitude
-        for (const part of this.shipOceanShipParts) {
-          part.obj.position.y = part.baseY + bob
+        if (this.shipOceanShipParts.length > 0) {
+          const bob = Math.sin(time * this.shipBobSpeed) * this.shipBobAmplitude
+          for (const part of this.shipOceanShipParts) {
+            part.obj.position.y = part.baseY + bob
+          }
         }
       }
 
