@@ -37,6 +37,9 @@ class App {
     this.manualRotateDirection = 0
     this.manualRotateSpeed = 0.03
 
+    this.uvScrollTextures = []
+    this.uvScrollSpeedY = 1
+
     this.shipOceanIndex = SHIP_OCEAN_INDEX
     this.shipOceanMesh = null
     this.shipOceanShipParts = []
@@ -173,6 +176,10 @@ class App {
           this.setupShipOcean(model)
         }
 
+        if (config.uvScrollY) {
+          this.collectUvScrollMaterials(model, config.uvScrollY)
+        }
+
         const mixer = new THREE.AnimationMixer(model)
         const clips = gltf.animations || []
 
@@ -212,6 +219,42 @@ class App {
         this.onRotatableTargetChanged?.(false, i)
       }
     })
+  }
+
+  collectUvScrollMaterials(model, keywords) {
+    const needles = keywords.map((k) => k.toLowerCase())
+    const texSlots = ['map', 'emissiveMap', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap']
+    const seen = new Set()
+    const matched = []
+
+    model.traverse((child) => {
+      if (!child.isMesh) return
+      const mats = Array.isArray(child.material) ? child.material : [child.material]
+      for (const m of mats) {
+        if (!m || !m.name) continue
+        const lname = m.name.toLowerCase()
+        if (!needles.some((n) => lname.includes(n))) continue
+
+        const slotsFound = []
+        for (const slot of texSlots) {
+          const tex = m[slot]
+          if (!tex) continue
+          slotsFound.push(slot)
+          if (seen.has(tex)) continue
+          seen.add(tex)
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+          tex.matrixAutoUpdate = true
+          tex.needsUpdate = true
+          this.uvScrollTextures.push({ texture: tex, speed: this.uvScrollSpeedY })
+        }
+        matched.push(`${m.name} [${slotsFound.join(',') || 'no-texture'}]`)
+      }
+    })
+
+    console.log('[uvScrollY] keywords:', keywords, 'matched materials:', matched, 'total textures:', this.uvScrollTextures.length)
+    if (matched.length === 0) {
+      console.warn('[uvScrollY] no materials matched keywords:', keywords)
+    }
   }
 
   setupShipOcean(model) {
@@ -415,6 +458,12 @@ class App {
           const bob = Math.sin(time * this.shipBobSpeed) * this.shipBobAmplitude
           for (const part of this.shipOceanShipParts) {
             part.obj.position.y = part.baseY + bob
+          }
+        }
+
+        if (this.uvScrollTextures.length > 0) {
+          for (const s of this.uvScrollTextures) {
+            s.texture.offset.x = (s.texture.offset.x + rawDelta * s.speed) % 1
           }
         }
       }
