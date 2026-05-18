@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { MindARThree } from 'mind-ar/dist/mindar-image-three.prod.js'
-import { markerConfigs, BP_JACKET_INDEX, SHIP_OCEAN_INDEX } from './markerConfigs.js'
+import { markerConfigs, SHIP_OCEAN_INDEX } from './markerConfigs.js'
 
 class App {
   constructor() {
@@ -30,16 +30,12 @@ class App {
     this.canvasHeight = 0
     this.mindARVideo = null
 
-    this.bpJacketIndex = BP_JACKET_INDEX
-    this.bpJacketModel = null
-    this.bpJacketRotationY = 0
-    this.bpJacketTargetFound = false
-    this.onBpJacketTargetChanged = null
+    this.rotatableModels = {}
+    this.rotatableRotationY = {}
+    this.activeRotatableIndex = null
+    this.onRotatableTargetChanged = null
     this.manualRotateDirection = 0
-    this.lastInteractionTime = 0
-    this.autoRotateSpeed = 0.01
     this.manualRotateSpeed = 0.03
-    this.autoRotateResumeDelay = 1500
 
     this.shipOceanIndex = SHIP_OCEAN_INDEX
     this.shipOceanMesh = null
@@ -152,24 +148,29 @@ class App {
         this.mixers[index] = mixer
         this.anchors[index].group.add(model)
 
-        if (index === this.bpJacketIndex) {
-          this.bpJacketModel = model
+        if (config.rotatable) {
+          this.rotatableModels[index] = model
+          this.rotatableRotationY[index] = 0
         }
       })
     })
 
-    const bpAnchor = this.anchors[this.bpJacketIndex]
-    if (bpAnchor) {
-      bpAnchor.onTargetFound = () => {
-        this.bpJacketTargetFound = true
-        this.onBpJacketTargetChanged?.(true)
+    this.markerConfigs.forEach((config, i) => {
+      if (!config.rotatable) return
+      const anchor = this.anchors[i]
+      if (!anchor) return
+      anchor.onTargetFound = () => {
+        this.activeRotatableIndex = i
+        this.onRotatableTargetChanged?.(true, i)
       }
-      bpAnchor.onTargetLost = () => {
-        this.bpJacketTargetFound = false
-        this.manualRotateDirection = 0
-        this.onBpJacketTargetChanged?.(false)
+      anchor.onTargetLost = () => {
+        if (this.activeRotatableIndex === i) {
+          this.activeRotatableIndex = null
+          this.manualRotateDirection = 0
+        }
+        this.onRotatableTargetChanged?.(false, i)
       }
-    }
+    })
   }
 
   setupShipOcean(model) {
@@ -214,11 +215,8 @@ class App {
     this.shipOceanShipParts = shipParts.map((obj) => ({ obj, baseY: obj.position.y }))
   }
 
-  setBpJacketRotation(direction) {
+  setRotation(direction) {
     this.manualRotateDirection = direction
-    if (direction === 0) {
-      this.lastInteractionTime = performance.now()
-    }
   }
 
   addLight() {
@@ -380,17 +378,12 @@ class App {
         }
       }
 
-      if (this.bpJacketModel && this.bpJacketTargetFound) {
-        if (this.manualRotateDirection !== 0) {
-          this.bpJacketRotationY += this.manualRotateDirection * this.manualRotateSpeed
-          this.bpJacketModel.rotation.y = this.bpJacketRotationY
-          this.lastInteractionTime = time
-        } else {
-          const idleFor = time - this.lastInteractionTime
-          if (this.lastInteractionTime === 0 || idleFor > this.autoRotateResumeDelay) {
-            // this.bpJacketRotationY += this.autoRotateSpeed
-            // this.bpJacketModel.rotation.y = this.bpJacketRotationY
-          }
+      if (this.activeRotatableIndex !== null && this.manualRotateDirection !== 0) {
+        const idx = this.activeRotatableIndex
+        const model = this.rotatableModels[idx]
+        if (model) {
+          this.rotatableRotationY[idx] += this.manualRotateDirection * this.manualRotateSpeed
+          model.rotation.y = this.rotatableRotationY[idx]
         }
       }
 

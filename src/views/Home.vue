@@ -138,7 +138,7 @@
 
         <Controls
           v-if="!capturing"
-          :show-rotate="bpJacketActive"
+          :show-rotate="rotatableActive"
           @onInitCapture="initCapture()"
           @onRecordStarted="startRecording()"
           @onRecordEnded="stopRecording()"
@@ -183,7 +183,7 @@ const openVideoView = ref(false)
 const started = ref(false)
 const starting = ref(false)
 const welcomeError = ref('')
-const bpJacketActive = ref(false)
+const rotatableActive = ref(false)
 
 const arDebugOpen = ref(false)
 const animationsEnabled = ref(true)
@@ -298,8 +298,8 @@ const handleStart = async () => {
     await nextTick()
 
     app = new App()
-    app.onBpJacketTargetChanged = (found) => {
-      bpJacketActive.value = found
+    app.onRotatableTargetChanged = (found) => {
+      rotatableActive.value = found
     }
     app.animationsEnabled = animationsEnabled.value
     app.preferStandardCamera = preferStandardCamera.value
@@ -389,11 +389,11 @@ const capture = async () => {
 }
 
 const handleRotateStart = (direction) => {
-  if (app) app.setBpJacketRotation(direction)
+  if (app) app.setRotation(direction)
 }
 
 const handleRotateEnd = () => {
-  if (app) app.setBpJacketRotation(0)
+  if (app) app.setRotation(0)
 }
 
 const startRecording = async () => {
