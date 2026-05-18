@@ -4,9 +4,9 @@ export const markerConfigs = [
   { file: '/models/bp-jacket.glb', clipIndex: 0, baked: true, rotatable: true }, // 2: Square pattern
   { file: '/models/ship-ocean.glb', clipIndex: 0, baked: true }, // 3: Tag / container
   {
-    file: '/models/ccus.glb',
-    clipIndex: 0,
-    uvScrollY: ['line'],
+    // file: '/models/ccus.glb',
+    // clipIndex: 0,
+    // uvScrollY: ['line'],
   }, // 4: CO2
   { file: '/models/train.glb', clipIndex: 0 }, // 5: Bor
   {
