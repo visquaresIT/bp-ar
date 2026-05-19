@@ -19,6 +19,7 @@ class App {
     this.gltfLoader = null
     this.markerConfigs = markerConfigs
     this.mixers = []
+    this.modelClips = []
 
     this.mediaRecorder = null
     this.recordedChunks = []
@@ -177,23 +178,17 @@ class App {
         }
 
         if (config.uvScrollY) {
-          this.collectUvScrollMaterials(model, config.uvScrollY)
+          this.collectUvScrollMaterials(model, config.uvScrollY, config.uvScrollReverse)
         }
 
         const mixer = new THREE.AnimationMixer(model)
         const clips = gltf.animations || []
+        console.log(`[anim] ${config.file} clips:`, clips.map((c) => `${c.name} (${c.duration.toFixed(2)}s)`))
 
-        if (config.skipClips) {
-          clips.forEach((clip) => {
-            if (!config.skipClips.includes(clip.name)) {
-              mixer.clipAction(clip).play()
-            }
-          })
-        } else if (typeof config.clipIndex === 'number' && clips[config.clipIndex]) {
-          mixer.clipAction(clips[config.clipIndex]).play()
-        }
+        this.playConfiguredClips(mixer, clips, config)
 
         this.mixers[index] = mixer
+        this.modelClips[index] = clips
         this.anchors[index].group.add(model)
 
         if (config.rotatable) {
@@ -204,25 +199,46 @@ class App {
     })
 
     this.markerConfigs.forEach((config, i) => {
-      if (!config.rotatable) return
       const anchor = this.anchors[i]
       if (!anchor) return
       anchor.onTargetFound = () => {
-        this.activeRotatableIndex = i
-        this.onRotatableTargetChanged?.(true, i)
+        const mixer = this.mixers[i]
+        const clips = this.modelClips[i]
+        if (mixer && clips) this.playConfiguredClips(mixer, clips, config)
+        if (config.rotatable) {
+          this.activeRotatableIndex = i
+          this.onRotatableTargetChanged?.(true, i)
+        }
       }
       anchor.onTargetLost = () => {
-        if (this.activeRotatableIndex === i) {
-          this.activeRotatableIndex = null
-          this.manualRotateDirection = 0
+        if (config.rotatable) {
+          if (this.activeRotatableIndex === i) {
+            this.activeRotatableIndex = null
+            this.manualRotateDirection = 0
+          }
+          this.onRotatableTargetChanged?.(false, i)
         }
-        this.onRotatableTargetChanged?.(false, i)
       }
     })
   }
 
-  collectUvScrollMaterials(model, keywords) {
+  playConfiguredClips(mixer, clips, config) {
+    if (!clips.length) return
+    mixer.stopAllAction()
+    if (config.playAllClips) {
+      clips.forEach((clip) => mixer.clipAction(clip).reset().play())
+    } else if (config.skipClips) {
+      clips.forEach((clip) => {
+        if (!config.skipClips.includes(clip.name)) mixer.clipAction(clip).reset().play()
+      })
+    } else if (typeof config.clipIndex === 'number' && clips[config.clipIndex]) {
+      mixer.clipAction(clips[config.clipIndex]).reset().play()
+    }
+  }
+
+  collectUvScrollMaterials(model, keywords, reverseKeywords = []) {
     const needles = keywords.map((k) => k.toLowerCase())
+    const reverseNeedles = reverseKeywords.map((k) => k.toLowerCase())
     const texSlots = ['map', 'emissiveMap', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap']
     const seen = new Set()
     const matched = []
@@ -234,6 +250,7 @@ class App {
         if (!m || !m.name) continue
         const lname = m.name.toLowerCase()
         if (!needles.some((n) => lname.includes(n))) continue
+        const direction = reverseNeedles.some((n) => lname.includes(n)) ? -1 : 1
 
         const slotsFound = []
         for (const slot of texSlots) {
@@ -245,9 +262,9 @@ class App {
           tex.wrapS = tex.wrapT = THREE.RepeatWrapping
           tex.matrixAutoUpdate = true
           tex.needsUpdate = true
-          this.uvScrollTextures.push({ texture: tex, speed: this.uvScrollSpeedY })
+          this.uvScrollTextures.push({ texture: tex, speed: this.uvScrollSpeedY, direction })
         }
-        matched.push(`${m.name} [${slotsFound.join(',') || 'no-texture'}]`)
+        matched.push(`${m.name} [${slotsFound.join(',') || 'no-texture'}] dir=${direction}`)
       }
     })
 
@@ -463,7 +480,7 @@ class App {
 
         if (this.uvScrollTextures.length > 0) {
           for (const s of this.uvScrollTextures) {
-            s.texture.offset.x = (s.texture.offset.x + rawDelta * s.speed) % 1
+            s.texture.offset.x = (s.texture.offset.x + rawDelta * s.speed * (s.direction ?? 1)) % 1
           }
         }
       }

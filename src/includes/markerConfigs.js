@@ -7,9 +7,11 @@ export const markerConfigs = [
     file: '/models/ccus.glb',
     clipIndex: 0,
     uvScrollY: ['line'],
+    uvScrollReverse: ['red lines 2', 'yellow lines'],
   }, // 4: CO2
-  { file: '/models/train.glb', clipIndex: 0 }, // 5: Bor
+  { file: '/models/ground-monas.glb', playAllClips: true }, // 5: Bor
 ]
 
 export const BP_JACKET_INDEX = 2
 export const SHIP_OCEAN_INDEX = 3
+export const CCUS_INDEX = 4

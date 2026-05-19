@@ -55,6 +55,11 @@
         <SliderRow label="Speed" v-model.number="current.buoyancy.speed" :min="0" :max="0.01" :step="0.0001" />
       </section>
 
+      <section v-if="isCcus && current.uvScroll" class="mb-4">
+        <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">UV Scroll (CCUS line)</h2>
+        <SliderRow label="Speed" v-model.number="current.uvScroll.speed" :min="-5" :max="5" :step="0.01" />
+      </section>
+
       <section v-if="isBpJacket && current.bpJacket" class="mb-4">
         <h2 class="text-xs uppercase tracking-wider opacity-60 mb-2">BP Jacket Rotation</h2>
         <SliderRow label="Manual Speed" v-model.number="current.bpJacket.manualRotateSpeed" :min="0" :max="0.2" :step="0.001" />
@@ -90,7 +95,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, h } from 'vue'
 import { RouterLink } from 'vue-router'
-import { markerConfigs, BP_JACKET_INDEX, SHIP_OCEAN_INDEX } from '../includes/markerConfigs.js'
+import { markerConfigs, BP_JACKET_INDEX, SHIP_OCEAN_INDEX, CCUS_INDEX } from '../includes/markerConfigs.js'
 
 const STORAGE_KEY = 'bp-ar:debug:v2'
 const WATER_NORMALS_URL = 'https://threejs.org/examples/textures/waternormals.jpg'
@@ -146,6 +151,7 @@ const current = computed(() => states[selectedIndex.value])
 
 const isShipOcean = computed(() => selectedIndex.value === SHIP_OCEAN_INDEX)
 const isBpJacket = computed(() => selectedIndex.value === BP_JACKET_INDEX)
+const isCcus = computed(() => selectedIndex.value === CCUS_INDEX)
 
 function defaultStateFor(index) {
   const base = {
@@ -172,6 +178,9 @@ function defaultStateFor(index) {
       autoRotateSpeed: 0.01,
       autoRotateResumeDelay: 1500,
     }
+  }
+  if (index === CCUS_INDEX) {
+    base.uvScroll = { speed: 1 }
   }
   return base
 }
@@ -208,6 +217,7 @@ let renderer, scene, camera, controls, mixer
 let currentModel = null
 let oceanMesh = null
 let shipParts = []
+let uvScrollTextures = []
 let clock = new THREE.Clock()
 let raf = null
 let resizeObserver = null
@@ -227,6 +237,7 @@ function clearScene() {
   }
   oceanMesh = null
   shipParts = []
+  uvScrollTextures = []
   mixer = null
 }
 
@@ -280,10 +291,23 @@ function loadModel(index) {
         setupShipOcean(model)
       }
 
+      if (cfg.uvScrollY) {
+        collectUvScrollMaterials(model, cfg.uvScrollY, cfg.uvScrollReverse)
+      }
+
       const clips = gltf.animations || []
-      if (typeof cfg.clipIndex === 'number' && clips[cfg.clipIndex]) {
+      console.log(`[debug anim] ${cfg.file} clips:`, clips.map((c) => `${c.name} (${c.duration.toFixed(2)}s)`))
+      if (clips.length) {
         mixer = new THREE.AnimationMixer(model)
-        mixer.clipAction(clips[cfg.clipIndex]).play()
+        if (cfg.playAllClips) {
+          clips.forEach((clip) => mixer.clipAction(clip).play())
+        } else if (cfg.skipClips) {
+          clips.forEach((clip) => {
+            if (!cfg.skipClips.includes(clip.name)) mixer.clipAction(clip).play()
+          })
+        } else if (typeof cfg.clipIndex === 'number' && clips[cfg.clipIndex]) {
+          mixer.clipAction(clips[cfg.clipIndex]).play()
+        }
       }
 
       currentModel = model
@@ -297,6 +321,44 @@ function loadModel(index) {
       loadError.value = `Failed to load ${cfg.file}: ${err?.message ?? err}`
     },
   )
+}
+
+function collectUvScrollMaterials(model, keywords, reverseKeywords = []) {
+  const needles = keywords.map((k) => k.toLowerCase())
+  const reverseNeedles = reverseKeywords.map((k) => k.toLowerCase())
+  const texSlots = ['map', 'emissiveMap', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap']
+  const seen = new Set()
+  const matched = []
+
+  model.traverse((child) => {
+    if (!child.isMesh) return
+    const mats = Array.isArray(child.material) ? child.material : [child.material]
+    for (const m of mats) {
+      if (!m || !m.name) continue
+      const lname = m.name.toLowerCase()
+      if (!needles.some((n) => lname.includes(n))) continue
+      const direction = reverseNeedles.some((n) => lname.includes(n)) ? -1 : 1
+
+      const slotsFound = []
+      for (const slot of texSlots) {
+        const tex = m[slot]
+        if (!tex) continue
+        slotsFound.push(slot)
+        if (seen.has(tex)) continue
+        seen.add(tex)
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+        tex.matrixAutoUpdate = true
+        tex.needsUpdate = true
+        uvScrollTextures.push({ texture: tex, direction })
+      }
+      matched.push(`${m.name} [${slotsFound.join(',') || 'no-texture'}] dir=${direction}`)
+    }
+  })
+
+  console.log('[debug uvScrollY] keywords:', keywords, 'reverse:', reverseKeywords, 'matched:', matched, 'textures:', uvScrollTextures.length)
+  if (matched.length === 0) {
+    console.warn('[debug uvScrollY] no materials matched keywords:', keywords)
+  }
 }
 
 function setupShipOcean(model) {
@@ -438,6 +500,13 @@ function animate() {
     const { amplitude, speed } = current.value.buoyancy
     const bob = Math.sin(t * speed) * amplitude
     for (const p of shipParts) p.obj.position.y = p.baseY + bob
+  }
+
+  if (uvScrollTextures.length && current.value?.uvScroll) {
+    const speed = current.value.uvScroll.speed
+    for (const s of uvScrollTextures) {
+      s.texture.offset.x = (s.texture.offset.x + dt * speed * s.direction) % 1
+    }
   }
 
   controls.update()
