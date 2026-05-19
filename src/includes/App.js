@@ -39,7 +39,7 @@ class App {
     this.manualRotateSpeed = 0.03
 
     this.uvScrollTextures = []
-    this.uvScrollSpeedY = 1
+    this.uvScrollSpeedY = -1
 
     this.shipOceanIndex = SHIP_OCEAN_INDEX
     this.shipOceanMesh = null

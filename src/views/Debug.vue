@@ -180,7 +180,7 @@ function defaultStateFor(index) {
     }
   }
   if (index === CCUS_INDEX) {
-    base.uvScroll = { speed: 1 }
+    base.uvScroll = { speed: -1 }
   }
   return base
 }

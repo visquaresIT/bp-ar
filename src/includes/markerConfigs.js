@@ -7,7 +7,7 @@ export const markerConfigs = [
     file: '/models/ccus.glb',
     clipIndex: 0,
     uvScrollY: ['line'],
-    uvScrollReverse: ['red lines 2', 'yellow lines'],
+    uvScrollReverse: ['red lines 2', 'yellow lines', 'blue line'],
   }, // 4: CO2
   { file: '/models/ground-monas.glb', playAllClips: true }, // 5: Bor
 ]
